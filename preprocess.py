@@ -2,6 +2,7 @@ import os
 import cv2
 import shutil
 from PIL import Image, ImageFilter, ImageChops
+from tqdm import tqdm
 
 # === Folders ===
 input_folders = {
@@ -48,26 +49,35 @@ for key in input_folders:
     original_folder = input_folders[key]
     processed_folder = output_folders[key]
 
-    # Prepare output directory
+    # Segurança: prevenir apagamento errado
+    assert "rmiguel_datasets" in processed_folder, "Caminho de output inseguro! Abortado."
+
+    # Criar output directory
     if os.path.exists(processed_folder):
+        print(f"⚠️ A pasta {processed_folder} já existe. Vai ser apagada e substituída.")
         shutil.rmtree(processed_folder)
     os.makedirs(processed_folder, exist_ok=True)
 
     all_images = [f for f in os.listdir(original_folder) if f.endswith('.jpg')]
 
-    for image_name in all_images:
+    for image_name in tqdm(all_images, desc=f"Processando {key}"):
         img_path = os.path.join(original_folder, image_name)
         processed_path = os.path.join(processed_folder, image_name)
 
-        # Load image in RGB
+        # Carregar imagem
         img_bgr = cv2.imread(img_path)
+        if img_bgr is None:
+            print(f"Erro ao carregar: {img_path}")
+            continue
+
         img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
 
-        # Preprocessing pipeline
+        # Pré-processamento
         img_rgb = remove_hairs(img_rgb)
-        # img_rgb = apply_clahe_rgb(img_rgb)             # Optional step
-        # img_rgb = normalize_illumination(img_rgb)      # Optional step
+        # img_rgb = apply_clahe_rgb(img_rgb)             # Opcional
+        # img_rgb = normalize_illumination(img_rgb)      # Opcional
 
+        # Afinação de canais
         img_pil = Image.fromarray(img_rgb)
         r, g, b = img_pil.split()
         r = sharpen_channel_pil(r)
@@ -75,7 +85,8 @@ for key in input_folders:
         b = sharpen_channel_pil(b)
         img_sharp = Image.merge('RGB', (r, g, b))
 
+        # Redimensionar e guardar
         img_resized = img_sharp.resize((224, 224), Image.BICUBIC)
         img_resized.save(processed_path)
 
-    print(f"Processed {len(all_images)} images from {key} set.")
+    print(f"{key.upper()}: {len(all_images)} imagens processadas.")
