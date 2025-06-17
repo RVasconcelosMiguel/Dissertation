@@ -37,20 +37,22 @@ df_preprocessed_test = df_test.copy()
 
 ######### Train preprocessed #########
 print("\n\n -----------------Train-----------------")
+print("\nDataframe head:")
 print(df_preprocessed_train.head())
 
 label_counts_train = df_preprocessed_train['label'].value_counts()
 
-print("Number of images per class:")
+print("\nNumber of images per class:")
 for label, count in label_counts_train.items():
     print(f"{label}: {count}")
 
 ######### Test preprocessed #########
 print("\n\n -----------------Test-----------------")
+print("\nDataframe head:")
 print(df_preprocessed_test.head())
 
 label_counts_test = df_preprocessed_test['label'].value_counts()
 
-print("Number of images per class:")
+print("\nNumber of images per class:")
 for label, count in label_counts_test.items():
     print(f"{label}: {count}")
