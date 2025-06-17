@@ -9,8 +9,8 @@ def load_dataframes():
     df_test = pd.read_csv('/raid/DATASETS/rmiguel_datasets/ISIC16/CSV/Testing_labels.csv',
                           header=None, names=['image', 'label'])
 
-    df_train['label'] = df_train['label'].map({'benign': 0, 'malignant': 1})
-    df_test['label'] = df_test['label'].astype(int)
+    df_train['label'] = df_train['label'].map({'benign': '0', 'malignant': '1'})
+    df_test['label'] = df_test['label'].astype(str)
 
     df_train['image'] = df_train['image'].astype(str) + '.jpg'
     df_test['image'] = df_test['image'].astype(str) + '.jpg'
