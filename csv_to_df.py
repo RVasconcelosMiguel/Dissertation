@@ -33,7 +33,7 @@ df_train['image'] = df_train['image'].astype(str) + '.jpg'
 df_test['image']  = df_test['image'].astype(str)  + '.jpg'
 
 df_preprocessed_train = df_train.copy()
-df_preprocessed_test = df_train.copy()
+df_preprocessed_test = df_test.copy()
 
 print(df_preprocessed_train.head())
 
