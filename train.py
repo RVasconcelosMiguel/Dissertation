@@ -1,5 +1,18 @@
 import os
+# Set environment variables before importing TensorFlow
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' 
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+
 os.makedirs("models", exist_ok=True)
+os.makedirs("/home/jtstudents/rmiguel/files_to_transfer", exist_ok=True)
+
+import sys
+
+# Redirect stdout and stderr to log file
+log_path = "/home/jtstudents/rmiguel/files_to_transfer/train_log.txt"
+log_file = open(log_path, "w")
+sys.stdout = log_file
+sys.stderr = log_file
 
 import tensorflow as tf
 
@@ -7,7 +20,17 @@ print("TensorFlow version:", tf.__version__)
 print("GPU available:", tf.config.list_physical_devices('GPU'))
 print("Num GPUs:", len(tf.config.list_physical_devices('GPU')))
 
-# Your existing GPU memory growth code here...
+# Configure GPU memory growth
+gpus = tf.config.list_physical_devices('GPU')
+if gpus:
+    try:
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+        print("Enabled GPU memory growth.")
+    except RuntimeError as e:
+        print(f"GPU memory growth error: {e}")
+else:
+    print("No GPU found — using CPU.")
 
 from model import build_model
 from data_loader import get_generators
@@ -66,3 +89,6 @@ history_fine = model.fit(train_gen, validation_data=val_gen, epochs=EPOCHS_FINE,
 save_history(history_fine, "models/history_fine.json")
 
 plot_history({"Head": history_head, "Fine": history_fine})
+
+print("Training complete.")
+log_file.close()
