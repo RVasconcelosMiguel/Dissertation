@@ -15,6 +15,7 @@ sys.stdout = log_file
 sys.stderr = log_file
 
 import tensorflow as tf
+import json  # keep import here as you already have
 
 print("TensorFlow version:", tf.__version__)
 print("GPU available:", tf.config.list_physical_devices('GPU'))
@@ -37,7 +38,6 @@ from data_loader import get_generators
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from plot_utils import plot_history
-import json
 
 IMG_SIZE = 224
 BATCH_SIZE = 32
@@ -47,9 +47,21 @@ LR_HEAD = 1e-4
 LR_FINE = 1e-5
 MODEL_PATH = "models/efficientnetb0_isic16.h5"
 
+# --- UPDATED save_history FUNCTION ---
 def save_history(history, filename):
+    # Convert any EagerTensor to float to avoid JSON serialization error
+    history_dict = {}
+    for key, values in history.history.items():
+        new_values = []
+        for v in values:
+            if hasattr(v, "numpy"):
+                new_values.append(float(v.numpy()))
+            else:
+                new_values.append(v)
+        history_dict[key] = new_values
     with open(filename, "w") as f:
-        json.dump(history.history, f)
+        json.dump(history_dict, f)
+# -------------------------------------
 
 train_gen, val_gen, test_gen = get_generators(img_size=IMG_SIZE, batch_size=BATCH_SIZE)
 
@@ -60,7 +72,7 @@ model.compile(optimizer=Adam(LR_HEAD), loss="binary_crossentropy", metrics=["acc
 
 callbacks_head = [
     EarlyStopping(monitor="val_loss", patience=3, restore_best_weights=True),
-    ModelCheckpoint("models/efficientnetb0_head_best.h5", save_best_only=True, monitor="val_loss")
+    ModelCheckpoint("models/efficientnetb0_head_best.h5", save_best_only=True, monitor="val_loss", save_weights_only=False)  # explicit save_weights_only=False (optional)
 ]
 
 print("Training classification head...")
@@ -81,7 +93,7 @@ model.compile(
 )
 
 early_stop = EarlyStopping(monitor="val_loss", patience=3, restore_best_weights=True)
-checkpoint = ModelCheckpoint(MODEL_PATH, save_best_only=True, monitor="val_loss")
+checkpoint = ModelCheckpoint(MODEL_PATH, save_best_only=True, monitor="val_loss", save_weights_only=False)  # again explicit, optional
 
 history_fine = model.fit(train_gen, validation_data=val_gen, epochs=EPOCHS_FINE,
                          callbacks=[early_stop, checkpoint])

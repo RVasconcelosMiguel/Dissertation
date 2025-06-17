@@ -26,20 +26,25 @@ if gpus:
 else:
     print("No GPU found — using CPU.")
 
-from tensorflow.keras.models import load_model
 from data_loader import get_generators
 from sklearn.metrics import classification_report
 import numpy as np
 from plot_utils import save_confusion_matrix
 
+from model import build_model  # **IMPORTANT: import your model builder**
+
 IMG_SIZE = 224
 BATCH_SIZE = 32
 
-model_path = "models/efficientnetb0_isic16.h5"
-if not os.path.isfile(model_path):
-    raise FileNotFoundError(f"Model file not found at {model_path}. Please check training phase completed successfully.")
-model = load_model(model_path)
-print(f"Loaded trained model from {model_path}")
+MODEL_PATH = "models/efficientnetb0_isic16.h5"
+if not os.path.isfile(MODEL_PATH):
+    raise FileNotFoundError(f"Model file not found at {MODEL_PATH}. Please check training phase completed successfully.")
+
+print("Rebuilding model architecture...")
+model, base_model = build_model(img_size=IMG_SIZE)
+
+print(f"Loading weights from {MODEL_PATH} ...")
+model.load_weights(MODEL_PATH)
 
 print("Preparing test generator...")
 _, _, test_gen = get_generators(img_size=IMG_SIZE, batch_size=BATCH_SIZE)
