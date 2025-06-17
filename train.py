@@ -1,33 +1,21 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.makedirs("models", exist_ok=True)
 
 import tensorflow as tf
 
-gpus = tf.config.list_physical_devices('GPU')
-if gpus:
-    try:
-        for gpu in gpus:
-            tf.config.experimental.set_memory_growth(gpu, True)
-        logical_gpus = tf.config.list_logical_devices('GPU')
-        print(f"Using GPU: {logical_gpus[0].name}")
-    except RuntimeError as e:
-        print(f"GPU config error: {e}")
-else:
-    print("No GPU found — using CPU")
+print("TensorFlow version:", tf.__version__)
+print("GPU available:", tf.config.list_physical_devices('GPU'))
+print("Num GPUs:", len(tf.config.list_physical_devices('GPU')))
+
+# Your existing GPU memory growth code here...
 
 from model import build_model
 from data_loader import get_generators
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from plot_utils import plot_history
+import json
 
-# Continue as before...
-
-
-# Debug check for GPU
-print("Available GPU devices:", tf.config.list_physical_devices('GPU'))
-
-# Hyperparameters
 IMG_SIZE = 224
 BATCH_SIZE = 32
 EPOCHS_HEAD = 15
@@ -36,18 +24,28 @@ LR_HEAD = 1e-4
 LR_FINE = 1e-5
 MODEL_PATH = "models/efficientnetb0_isic16.h5"
 
-# Load data
+def save_history(history, filename):
+    with open(filename, "w") as f:
+        json.dump(history.history, f)
+
 train_gen, val_gen, test_gen = get_generators(img_size=IMG_SIZE, batch_size=BATCH_SIZE)
 
-# Build and compile model
 model, base_model = build_model(img_size=IMG_SIZE)
+model.summary()
+
 model.compile(optimizer=Adam(LR_HEAD), loss="binary_crossentropy", metrics=["accuracy"])
 
-# Train head
-print("Training classification head...")
-history_head = model.fit(train_gen, validation_data=val_gen, epochs=EPOCHS_HEAD)
+callbacks_head = [
+    EarlyStopping(monitor="val_loss", patience=3, restore_best_weights=True),
+    ModelCheckpoint("models/efficientnetb0_head_best.h5", save_best_only=True, monitor="val_loss")
+]
 
-# Fine-tune base model
+print("Training classification head...")
+history_head = model.fit(train_gen, validation_data=val_gen, epochs=EPOCHS_HEAD, callbacks=callbacks_head)
+model.save("models/efficientnetb0_head_trained.h5")
+print("Saved model after head training.")
+save_history(history_head, "models/history_head.json")
+
 print("Fine-tuning base model...")
 base_model.trainable = True
 for layer in base_model.layers[:100]:
@@ -56,12 +54,7 @@ for layer in base_model.layers[:100]:
 model.compile(
     optimizer=Adam(LR_FINE),
     loss="binary_crossentropy",
-    metrics=[
-        "accuracy",
-        tf.keras.metrics.AUC(),
-        tf.keras.metrics.Precision(),
-        tf.keras.metrics.Recall()
-    ]
+    metrics=["accuracy", tf.keras.metrics.AUC(), tf.keras.metrics.Precision(), tf.keras.metrics.Recall()]
 )
 
 early_stop = EarlyStopping(monitor="val_loss", patience=3, restore_best_weights=True)
@@ -70,5 +63,6 @@ checkpoint = ModelCheckpoint(MODEL_PATH, save_best_only=True, monitor="val_loss"
 history_fine = model.fit(train_gen, validation_data=val_gen, epochs=EPOCHS_FINE,
                          callbacks=[early_stop, checkpoint])
 
-# Save plots
+save_history(history_fine, "models/history_fine.json")
+
 plot_history({"Head": history_head, "Fine": history_fine})

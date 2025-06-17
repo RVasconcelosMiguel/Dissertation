@@ -3,7 +3,6 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 import tensorflow as tf
 
-# Modern GPU memory management
 gpus = tf.config.list_physical_devices('GPU')
 if gpus:
     try:
@@ -18,35 +17,39 @@ else:
 
 from tensorflow.keras.models import load_model
 from data_loader import get_generators
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import classification_report
 import numpy as np
 from plot_utils import save_confusion_matrix
 
-# Load trained model
-print("Loading trained model...")
-model = load_model("models/efficientnetb0_isic16.h5")
+# Config
+IMG_SIZE = 224
+BATCH_SIZE = 32
 
-# Load test data
+model_path = "models/efficientnetb0_isic16.h5"
+if not os.path.isfile(model_path):
+    raise FileNotFoundError(f"Model file not found at {model_path}. Please check training phase completed successfully.")
+model = load_model(model_path)
+print(f"Loaded trained model from {model_path}")
+
 print("Preparing test generator...")
-_, _, test_gen = get_generators()
+_, _, test_gen = get_generators(img_size=IMG_SIZE, batch_size=BATCH_SIZE)
 
-# Evaluate model
 print("Evaluating model on test set...")
 results = model.evaluate(test_gen)
 for name, val in zip(model.metrics_names, results):
     print(f"{name}: {val:.4f}")
 
-# Predict
 print("Generating predictions...")
 y_prob = model.predict(test_gen)
 y_pred = (y_prob > 0.5).astype(int).flatten()
-y_true = test_gen.classes
+
+# Ensure test_gen has attribute `classes`
+y_true = test_gen.classes  
 labels = list(test_gen.class_indices.keys())
 
-# Report
 print("\nClassification Report:")
 print(classification_report(y_true, y_pred, target_names=labels))
 
-# Confusion Matrix
+os.makedirs("logs", exist_ok=True)
 print("Saving confusion matrix plot...")
 save_confusion_matrix(y_true, y_pred, labels, "logs/confusion_matrix.png")
