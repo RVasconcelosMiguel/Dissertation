@@ -33,3 +33,5 @@ df_train['image'] = df_train['image'].astype(str) + '.jpg'
 df_test['image']  = df_test['image'].astype(str)  + '.jpg'
 
 print(df_train.head())
+
+print(df_test.head())
