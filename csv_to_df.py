@@ -56,3 +56,4 @@ label_counts_test = df_preprocessed_test['label'].value_counts()
 print("\nNumber of images per class:")
 for label, count in label_counts_test.items():
     print(f"{label}: {count}")
+print("\n---------------------------------------\n")
