@@ -1,3 +1,21 @@
+import os
+import time
+import random
+import zipfile
+import json
+import logging
+import shutil
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from tqdm import tqdm
+
+import cv2
+
+from PIL import Image, ImageFilter, ImageEnhance, ImageChops, ImageOps
+
+
 # Define paths
 labels_path_train = '/raid/DATASETS/rmiguel_datasets/ISIC16/CSV/Training_labels.csv'
 labels_path_test = '/raid/DATASETS/rmiguel_datasets/ISIC16/CSV/Testing_labels.csv'
@@ -13,3 +31,5 @@ df_test['label'] = df_test['label'].astype(int)
 # === Add '.jpg' extension to all image names ===
 df_train['image'] = df_train['image'].astype(str) + '.jpg'
 df_test['image']  = df_test['image'].astype(str)  + '.jpg'
+
+print(df_train.head())
