@@ -29,7 +29,7 @@ df_preprocessed_train = df_train.copy()
 df_preprocessed_test = df_test.copy()
 
 # === TRAIN STATS ===
-print("\n\n -----------------Train-----------------")
+print("\n\n-----------------Train-----------------")
 print("\nDataframe head:")
 print(df_preprocessed_train.head())
 
@@ -39,7 +39,7 @@ for label, count in label_counts_train.items():
     print(f"{label}: {count}")
 
 # === TEST STATS ===
-print("\n\n -----------------Test-----------------")
+print("\n\n-----------------Test-----------------")
 print("\nDataframe head:")
 print(df_preprocessed_test.head())
 
@@ -48,7 +48,7 @@ print("\nNumber of images per class:")
 for label, count in label_counts_test.items():
     print(f"{label}: {count}")
 
-print("\n---------------------------------------\n")
+print("\n---------------Data split---------------\n")
 
 # === Stratified train/val split from training set ===
 df_preprocessed_train_train, df_preprocessed_train_val = train_test_split(
@@ -61,3 +61,5 @@ df_preprocessed_train_train, df_preprocessed_train_val = train_test_split(
 print("Train:", len(df_preprocessed_train_train),
       "Validation:", len(df_preprocessed_train_val),
       "Test:", len(df_preprocessed_test))
+
+print("\n---------------------------------------\n")
