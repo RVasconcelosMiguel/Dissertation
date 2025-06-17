@@ -63,13 +63,19 @@ def make_json_serializable(obj):
         return [make_json_serializable(i) for i in obj]
     elif isinstance(obj, dict):
         return {k: make_json_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, (np.float32, np.float64, np.int64, np.int32)):
+        return obj.item()
     else:
         return obj
 
 def save_history(history, filename):
-    history_dict = make_json_serializable(history.history)
-    with open(filename, "w") as f:
-        json.dump(history_dict, f, indent=2)
+    try:
+        history_dict = make_json_serializable(history.history)
+        with open(filename, "w") as f:
+            json.dump(history_dict, f, indent=2)
+    except Exception as e:
+        print(f"[ERROR] Failed to save history: {e}")
+
 
 # --- Load data ---
 train_gen, val_gen, test_gen = get_generators(img_size=IMG_SIZE, batch_size=BATCH_SIZE)
