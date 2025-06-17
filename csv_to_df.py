@@ -32,14 +32,21 @@ df_test['label'] = df_test['label'].astype(int)
 df_train['image'] = df_train['image'].astype(str) + '.jpg'
 df_test['image']  = df_test['image'].astype(str)  + '.jpg'
 
-df_preprocessed = df_train.copy()
+df_preprocessed_train = df_train.copy()
+df_preprocessed_test = df_train.copy()
 
-print(df_preprocessed.head())
+print(df_preprocessed_train.head())
 
-print(df_preprocessed.head())
+print(df_preprocessed_test.head())
 
-label_counts = df_preprocessed['label'].value_counts()
+label_counts_train = df_preprocessed_train['label'].value_counts()
 
-print("Number of images per class:")
-for label, count in label_counts.items():
+print("Number of images per class (train):")
+for label, count in label_counts_train.items():
+    print(f"{label}: {count}")
+
+label_counts_test = df_preprocessed_test['label'].value_counts()
+
+print("Number of images per class (test):")
+for label, count in label_counts_test.items():
     print(f"{label}: {count}")
