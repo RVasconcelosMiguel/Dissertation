@@ -1,8 +1,4 @@
 import os
-import sys
-import pickle
-import numpy as np
-import tensorflow as tf
 
 # Set environment variables before importing TensorFlow
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -12,11 +8,17 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 os.makedirs("models", exist_ok=True)
 os.makedirs("/home/jtstudents/rmiguel/files_to_transfer", exist_ok=True)
 
+import sys
+
 # Redirect stdout and stderr to log file
 log_path = "/home/jtstudents/rmiguel/files_to_transfer/train_log.txt"
 log_file = open(log_path, "w")
 sys.stdout = log_file
 sys.stderr = log_file
+
+import json
+import numpy as np
+import tensorflow as tf
 
 # --- TensorFlow info ---
 print("TensorFlow version:", tf.__version__)
@@ -51,15 +53,29 @@ LR_HEAD = 1e-4
 LR_FINE = 1e-5
 MODEL_PATH = "models/efficientnetb0_isic16.h5"
 
-# --- History saving with pickle ---
-def save_history_pickle(history, filename):
+# --- Safe history saving utility ---
+def make_json_serializable(obj):
+    if isinstance(obj, tf.Tensor):
+        return obj.numpy().tolist()
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, (list, tuple)):
+        return [make_json_serializable(i) for i in obj]
+    elif isinstance(obj, dict):
+        return {k: make_json_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, (np.float32, np.float64, np.int64, np.int32)):
+        return obj.item()
+    else:
+        return obj
+
+def save_history(history, filename):
     try:
-        print(f"[DEBUG] Saving training history with pickle to {filename} ...")
-        with open(filename, "wb") as f:
-            pickle.dump(history.history, f)
-        print("[DEBUG] Training history saved successfully.")
+        history_dict = make_json_serializable(history.history)
+        with open(filename, "w") as f:
+            json.dump(history_dict, f, indent=2)
     except Exception as e:
-        print(f"[ERROR] Failed to save history with pickle: {e}")
+        print(f"[ERROR] Failed to save history: {e}")
+
 
 # --- Load data ---
 train_gen, val_gen, test_gen = get_generators(img_size=IMG_SIZE, batch_size=BATCH_SIZE)
@@ -87,13 +103,11 @@ history_head = model.fit(
     epochs=EPOCHS_HEAD,
     callbacks=callbacks_head
 )
-
 model.save("models/efficientnetb0_head_trained.h5")
 print("Saved model after head training.")
+save_history(history_head, "models/history_head.json")
 
-save_history_pickle(history_head, "models/history_head.pkl")
-
-# --- Fine-tune base model ---
+# --- Fine-tune full model ---
 print("Fine-tuning base model...")
 base_model.trainable = True
 for layer in base_model.layers[:100]:
@@ -121,8 +135,7 @@ history_fine = model.fit(
     epochs=EPOCHS_FINE,
     callbacks=callbacks_fine
 )
-
-save_history_pickle(history_fine, "models/history_fine.pkl")
+save_history(history_fine, "models/history_fine.json")
 
 # --- Plot training history ---
 plot_history({
