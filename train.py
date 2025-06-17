@@ -1,8 +1,10 @@
 import os
-# Set environment variables before importing TensorFlow
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
+# Set environment variables before importing TensorFlow
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+
+# Ensure required directories exist
 os.makedirs("models", exist_ok=True)
 os.makedirs("/home/jtstudents/rmiguel/files_to_transfer", exist_ok=True)
 
@@ -14,9 +16,11 @@ log_file = open(log_path, "w")
 sys.stdout = log_file
 sys.stderr = log_file
 
+import json
+import numpy as np
 import tensorflow as tf
-import json  # keep import here as you already have
 
+# --- TensorFlow info ---
 print("TensorFlow version:", tf.__version__)
 print("GPU available:", tf.config.list_physical_devices('GPU'))
 print("Num GPUs:", len(tf.config.list_physical_devices('GPU')))
@@ -29,16 +33,18 @@ if gpus:
             tf.config.experimental.set_memory_growth(gpu, True)
         print("Enabled GPU memory growth.")
     except RuntimeError as e:
-        print(f"GPU memory growth error: {e}")
+        print("Error enabling memory growth:", e)
 else:
     print("No GPU found — using CPU.")
 
+# --- Imports from project ---
 from model import build_model
 from data_loader import get_generators
+from plot_utils import plot_history
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
-from plot_utils import plot_history
 
+# --- Training configuration ---
 IMG_SIZE = 224
 BATCH_SIZE = 32
 EPOCHS_HEAD = 15
@@ -47,7 +53,7 @@ LR_HEAD = 1e-4
 LR_FINE = 1e-5
 MODEL_PATH = "models/efficientnetb0_isic16.h5"
 
-# --- UPDATED save_history FUNCTION ---
+# --- Safe history saving utility ---
 def make_json_serializable(obj):
     if isinstance(obj, tf.Tensor):
         return obj.numpy().tolist()
@@ -65,26 +71,37 @@ def save_history(history, filename):
     with open(filename, "w") as f:
         json.dump(history_dict, f, indent=2)
 
-# -------------------------------------
-
+# --- Load data ---
 train_gen, val_gen, test_gen = get_generators(img_size=IMG_SIZE, batch_size=BATCH_SIZE)
 
+# --- Build and compile model (head only) ---
 model, base_model = build_model(img_size=IMG_SIZE)
 model.summary()
 
-model.compile(optimizer=Adam(LR_HEAD), loss="binary_crossentropy", metrics=["accuracy"])
+model.compile(
+    optimizer=Adam(LR_HEAD),
+    loss="binary_crossentropy",
+    metrics=["accuracy"]
+)
 
 callbacks_head = [
     EarlyStopping(monitor="val_loss", patience=3, restore_best_weights=True),
-    ModelCheckpoint("models/efficientnetb0_head_best.h5", save_best_only=True, monitor="val_loss", save_weights_only=False)  # explicit save_weights_only=False (optional)
+    ModelCheckpoint("models/efficientnetb0_head_best.h5", monitor="val_loss", save_best_only=True, save_weights_only=False)
 ]
 
+# --- Train head ---
 print("Training classification head...")
-history_head = model.fit(train_gen, validation_data=val_gen, epochs=EPOCHS_HEAD, callbacks=callbacks_head)
+history_head = model.fit(
+    train_gen,
+    validation_data=val_gen,
+    epochs=EPOCHS_HEAD,
+    callbacks=callbacks_head
+)
 model.save("models/efficientnetb0_head_trained.h5")
 print("Saved model after head training.")
 save_history(history_head, "models/history_head.json")
 
+# --- Fine-tune full model ---
 print("Fine-tuning base model...")
 base_model.trainable = True
 for layer in base_model.layers[:100]:
@@ -93,18 +110,32 @@ for layer in base_model.layers[:100]:
 model.compile(
     optimizer=Adam(LR_FINE),
     loss="binary_crossentropy",
-    metrics=["accuracy", tf.keras.metrics.AUC(), tf.keras.metrics.Precision(), tf.keras.metrics.Recall()]
+    metrics=[
+        "accuracy",
+        tf.keras.metrics.AUC(name="auc"),
+        tf.keras.metrics.Precision(name="precision"),
+        tf.keras.metrics.Recall(name="recall")
+    ]
 )
 
-early_stop = EarlyStopping(monitor="val_loss", patience=3, restore_best_weights=True)
-checkpoint = ModelCheckpoint(MODEL_PATH, save_best_only=True, monitor="val_loss", save_weights_only=False)  # again explicit, optional
+callbacks_fine = [
+    EarlyStopping(monitor="val_loss", patience=3, restore_best_weights=True),
+    ModelCheckpoint(MODEL_PATH, monitor="val_loss", save_best_only=True, save_weights_only=False)
+]
 
-history_fine = model.fit(train_gen, validation_data=val_gen, epochs=EPOCHS_FINE,
-                         callbacks=[early_stop, checkpoint])
-
+history_fine = model.fit(
+    train_gen,
+    validation_data=val_gen,
+    epochs=EPOCHS_FINE,
+    callbacks=callbacks_fine
+)
 save_history(history_fine, "models/history_fine.json")
 
-plot_history({"Head": history_head, "Fine": history_fine})
+# --- Plot training history ---
+plot_history({
+    "Head": history_head,
+    "Fine": history_fine
+})
 
 print("Training complete.")
 log_file.close()
