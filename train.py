@@ -4,6 +4,14 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 import tensorflow as tf
 from plot_utils import plot_history
+from keras.backend.tensorflow_backend import set_session
+import os
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # Use GPU 0
+
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True  # dynamically allocate GPU memory
+set_session(tf.Session(config=config))
 
 # Hyperparams
 IMG_SIZE = 224
