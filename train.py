@@ -9,16 +9,15 @@ os.makedirs("models", exist_ok=True)
 os.makedirs("/home/jtstudents/rmiguel/files_to_transfer", exist_ok=True)
 
 import sys
+import json
+import numpy as np
+import tensorflow as tf
 
 # Redirect stdout and stderr to log file
 log_path = "/home/jtstudents/rmiguel/files_to_transfer/train_log.txt"
 log_file = open(log_path, "w")
 sys.stdout = log_file
 sys.stderr = log_file
-
-import json
-import numpy as np
-import tensorflow as tf
 
 # --- TensorFlow info ---
 print("TensorFlow version:", tf.__version__)
@@ -55,12 +54,11 @@ MODEL_PATH = "models/efficientnetb0_isic16.h5"
 
 # --- Safe history saving utility ---
 def make_json_serializable(obj):
-    import numpy as np
     if isinstance(obj, tf.Tensor):
         return obj.numpy().tolist()
     elif isinstance(obj, np.ndarray):
         return obj.tolist()
-    elif isinstance(obj, (np.float32, np.float64, np.int64, np.int32)):
+    elif isinstance(obj, (np.generic,)):
         return obj.item()
     elif isinstance(obj, (list, tuple)):
         return [make_json_serializable(i) for i in obj]
@@ -71,20 +69,13 @@ def make_json_serializable(obj):
 
 def save_history(history, filename):
     try:
-        # First print keys and sample value types (for debugging)
         print("[DEBUG] Saving training history...")
-        for k, v in history.history.items():
-            print(f"Key: {k}, Type: {type(v)}, Sample value type: {type(v[0])}")
-
         history_dict = make_json_serializable(history.history)
-
         with open(filename, "w") as f:
             json.dump(history_dict, f, indent=2)
-        print("[DEBUG] Training history saved successfully.")
+        print(f"[DEBUG] Training history saved to {filename}.")
     except Exception as e:
-        print(f"[ERROR] Failed to save history to {filename}: {e}")
-
-
+        print(f"[ERROR] Could not save history: {e}")
 
 # --- Load data ---
 train_gen, val_gen, test_gen = get_generators(img_size=IMG_SIZE, batch_size=BATCH_SIZE)
@@ -101,7 +92,7 @@ model.compile(
 
 callbacks_head = [
     EarlyStopping(monitor="val_loss", patience=3, restore_best_weights=True),
-    ModelCheckpoint("models/efficientnetb0_head_best.h5", monitor="val_loss", save_best_only=True, save_weights_only=False)
+    ModelCheckpoint("models/efficientnetb0_head_best.h5", monitor="val_loss", save_best_only=True)
 ]
 
 # --- Train head ---
@@ -112,11 +103,13 @@ history_head = model.fit(
     epochs=EPOCHS_HEAD,
     callbacks=callbacks_head
 )
+
 model.save("models/efficientnetb0_head_trained.h5")
 print("Saved model after head training.")
+
 save_history(history_head, "models/history_head.json")
 
-# --- Fine-tune full model ---
+# --- Fine-tune base model ---
 print("Fine-tuning base model...")
 base_model.trainable = True
 for layer in base_model.layers[:100]:
@@ -135,7 +128,7 @@ model.compile(
 
 callbacks_fine = [
     EarlyStopping(monitor="val_loss", patience=3, restore_best_weights=True),
-    ModelCheckpoint(MODEL_PATH, monitor="val_loss", save_best_only=True, save_weights_only=False)
+    ModelCheckpoint(MODEL_PATH, monitor="val_loss", save_best_only=True)
 ]
 
 history_fine = model.fit(
@@ -144,6 +137,7 @@ history_fine = model.fit(
     epochs=EPOCHS_FINE,
     callbacks=callbacks_fine
 )
+
 save_history(history_fine, "models/history_fine.json")
 
 # --- Plot training history ---
