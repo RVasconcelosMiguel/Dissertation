@@ -13,7 +13,7 @@ if gpus:
     except RuntimeError as e:
         print(f"GPU config error: {e}")
 else:
-    print("⚠️ No GPU found — using CPU")
+    print("No GPU found — using CPU")
 
 from model import build_model
 from data_loader import get_generators
@@ -44,11 +44,11 @@ model, base_model = build_model(img_size=IMG_SIZE)
 model.compile(optimizer=Adam(LR_HEAD), loss="binary_crossentropy", metrics=["accuracy"])
 
 # Train head
-print("🔧 Training classification head...")
+print("Training classification head...")
 history_head = model.fit(train_gen, validation_data=val_gen, epochs=EPOCHS_HEAD)
 
 # Fine-tune base model
-print("🔧 Fine-tuning base model...")
+print("Fine-tuning base model...")
 base_model.trainable = True
 for layer in base_model.layers[:100]:
     layer.trainable = False

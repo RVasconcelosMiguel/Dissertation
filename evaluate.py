@@ -14,7 +14,7 @@ if gpus:
     except RuntimeError as e:
         print(f"GPU configuration error: {e}")
 else:
-    print("⚠️ No GPU found — using CPU.")
+    print("No GPU found — using CPU.")
 
 from tensorflow.keras.models import load_model
 from data_loader import get_generators

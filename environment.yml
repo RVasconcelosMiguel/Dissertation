@@ -152,14 +152,15 @@ dependencies:
       - flatbuffers==25.2.10
       - gast==0.4.0
       - google-auth==2.40.3
-      - google-auth-oauthlib==1.0.0
+      - google-auth-oauthlib==0.4.6
       - google-pasta==0.2.0
       - grpcio==1.73.0
       - h5py==3.14.0
       - idna==3.10
       - jax==0.4.30
       - jaxlib==0.4.30
-      - keras==2.12.0
+      - keras==2.10.0
+      - keras-preprocessing==1.1.2
       - libclang==18.1.1
       - markdown==3.8
       - markupsafe==3.0.2
@@ -167,16 +168,17 @@ dependencies:
       - numpy==1.23.5
       - oauthlib==3.2.2
       - opt-einsum==3.4.0
-      - protobuf==4.25.8
+      - protobuf==3.19.6
       - pyasn1==0.6.1
       - pyasn1-modules==0.4.2
       - requests==2.32.4
       - requests-oauthlib==2.0.0
       - rsa==4.9.1
-      - tensorboard==2.12.3
-      - tensorboard-data-server==0.7.2
-      - tensorflow==2.12.0
-      - tensorflow-estimator==2.12.0
+      - tensorboard==2.10.1
+      - tensorboard-data-server==0.6.1
+      - tensorboard-plugin-wit==1.8.1
+      - tensorflow==2.10.0
+      - tensorflow-estimator==2.10.0
       - tensorflow-io-gcs-filesystem==0.37.1
       - termcolor==3.1.0
       - torchsummary==1.5.1
