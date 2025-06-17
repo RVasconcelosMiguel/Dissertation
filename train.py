@@ -48,29 +48,22 @@ LR_FINE = 1e-5
 MODEL_PATH = "models/efficientnetb0_isic16.h5"
 
 # --- UPDATED save_history FUNCTION ---
+def make_json_serializable(obj):
+    if isinstance(obj, tf.Tensor):
+        return obj.numpy().tolist()
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, (list, tuple)):
+        return [make_json_serializable(i) for i in obj]
+    elif isinstance(obj, dict):
+        return {k: make_json_serializable(v) for k, v in obj.items()}
+    else:
+        return obj
+
 def save_history(history, filename):
-    import tensorflow as tf
-    import numpy as np
-    import json
-
-    def convert(o):
-        if isinstance(o, tf.Tensor):
-            return o.numpy().item() if o.shape == () else o.numpy().tolist()
-        elif isinstance(o, np.ndarray):
-            return o.tolist()
-        elif isinstance(o, (list, tuple)):
-            return [convert(i) for i in o]
-        elif isinstance(o, dict):
-            return {k: convert(v) for k, v in o.items()}
-        elif isinstance(o, (float, int, str, type(None))):
-            return o
-        else:
-            return str(o)  # Fallback for other types (like objects)
-
-    clean_history = convert(history.history)
-
+    history_dict = make_json_serializable(history.history)
     with open(filename, "w") as f:
-        json.dump(clean_history, f)
+        json.dump(history_dict, f, indent=2)
 
 # -------------------------------------
 
