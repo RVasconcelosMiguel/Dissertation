@@ -49,18 +49,29 @@ MODEL_PATH = "models/efficientnetb0_isic16.h5"
 
 # --- UPDATED save_history FUNCTION ---
 def save_history(history, filename):
-    # Convert any TensorFlow tensors to native Python types
+    import tensorflow as tf
+    import numpy as np
+    import json
+
     def convert(o):
         if isinstance(o, tf.Tensor):
-            return o.numpy().tolist()  # Convert tensors to list
-        if isinstance(o, (np.ndarray,)):
+            return o.numpy().item() if o.shape == () else o.numpy().tolist()
+        elif isinstance(o, np.ndarray):
             return o.tolist()
-        return o
+        elif isinstance(o, (list, tuple)):
+            return [convert(i) for i in o]
+        elif isinstance(o, dict):
+            return {k: convert(v) for k, v in o.items()}
+        elif isinstance(o, (float, int, str, type(None))):
+            return o
+        else:
+            return str(o)  # Fallback for other types (like objects)
 
-    history_dict = {k: [convert(vv) for vv in v] for k, v in history.history.items()}
+    clean_history = convert(history.history)
 
     with open(filename, "w") as f:
-        json.dump(history_dict, f)
+        json.dump(clean_history, f)
+
 # -------------------------------------
 
 train_gen, val_gen, test_gen = get_generators(img_size=IMG_SIZE, batch_size=BATCH_SIZE)
