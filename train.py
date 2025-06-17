@@ -1,18 +1,28 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # Must be before TensorFlow is imported
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 import tensorflow as tf
-from keras.backend.tensorflow_backend import set_session
 
-config = tf.ConfigProto()
-config.gpu_options.allow_growth = True
-set_session(tf.Session(config=config))
+gpus = tf.config.list_physical_devices('GPU')
+if gpus:
+    try:
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+        logical_gpus = tf.config.list_logical_devices('GPU')
+        print(f"Using GPU: {logical_gpus[0].name}")
+    except RuntimeError as e:
+        print(f"GPU config error: {e}")
+else:
+    print("⚠️ No GPU found — using CPU")
 
 from model import build_model
 from data_loader import get_generators
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from plot_utils import plot_history
+
+# Continue as before...
+
 
 # Debug check for GPU
 print("Available GPU devices:", tf.config.list_physical_devices('GPU'))
