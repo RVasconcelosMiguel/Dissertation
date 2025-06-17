@@ -49,16 +49,16 @@ MODEL_PATH = "models/efficientnetb0_isic16.h5"
 
 # --- UPDATED save_history FUNCTION ---
 def save_history(history, filename):
-    # Convert any EagerTensor to float to avoid JSON serialization error
-    history_dict = {}
-    for key, values in history.history.items():
-        new_values = []
-        for v in values:
-            if hasattr(v, "numpy"):
-                new_values.append(float(v.numpy()))
-            else:
-                new_values.append(v)
-        history_dict[key] = new_values
+    # Convert any TensorFlow tensors to native Python types
+    def convert(o):
+        if isinstance(o, tf.Tensor):
+            return o.numpy().tolist()  # Convert tensors to list
+        if isinstance(o, (np.ndarray,)):
+            return o.tolist()
+        return o
+
+    history_dict = {k: [convert(vv) for vv in v] for k, v in history.history.items()}
+
     with open(filename, "w") as f:
         json.dump(history_dict, f)
 # -------------------------------------
