@@ -55,26 +55,35 @@ MODEL_PATH = "models/efficientnetb0_isic16.h5"
 
 # --- Safe history saving utility ---
 def make_json_serializable(obj):
+    import numpy as np
     if isinstance(obj, tf.Tensor):
         return obj.numpy().tolist()
     elif isinstance(obj, np.ndarray):
         return obj.tolist()
+    elif isinstance(obj, (np.float32, np.float64, np.int64, np.int32)):
+        return obj.item()
     elif isinstance(obj, (list, tuple)):
         return [make_json_serializable(i) for i in obj]
     elif isinstance(obj, dict):
         return {k: make_json_serializable(v) for k, v in obj.items()}
-    elif isinstance(obj, (np.float32, np.float64, np.int64, np.int32)):
-        return obj.item()
     else:
         return obj
 
 def save_history(history, filename):
     try:
+        # First print keys and sample value types (for debugging)
+        print("[DEBUG] Saving training history...")
+        for k, v in history.history.items():
+            print(f"Key: {k}, Type: {type(v)}, Sample value type: {type(v[0])}")
+
         history_dict = make_json_serializable(history.history)
+
         with open(filename, "w") as f:
             json.dump(history_dict, f, indent=2)
+        print("[DEBUG] Training history saved successfully.")
     except Exception as e:
-        print(f"[ERROR] Failed to save history: {e}")
+        print(f"[ERROR] Failed to save history to {filename}: {e}")
+
 
 
 # --- Load data ---
