@@ -33,10 +33,10 @@ else:
 
 # --- Project imports ---
 from data_loader import get_generators
-from model import build_model
 from sklearn.metrics import classification_report
 from plot_utils import save_confusion_matrix
 import numpy as np
+from tensorflow.keras.models import load_model  # <-- Import here
 
 # --- Config ---
 IMG_SIZE = 224
@@ -47,11 +47,8 @@ if not os.path.isfile(MODEL_PATH):
     raise FileNotFoundError(f"[ERROR] Model not found at {MODEL_PATH}. Please verify training completion.")
 
 # --- Load model ---
-print("[INFO] Rebuilding model architecture...")
-model, base_model = build_model(img_size=IMG_SIZE)
-
-print(f"[INFO] Loading model weights from {MODEL_PATH} ...")
-model.load_weights(MODEL_PATH)
+print(f"[INFO] Loading full model from {MODEL_PATH} ...")
+model = load_model(MODEL_PATH)
 
 # --- Load data ---
 print("[INFO] Preparing test generator...")
