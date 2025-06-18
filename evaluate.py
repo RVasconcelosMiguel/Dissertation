@@ -69,11 +69,12 @@ except Exception as e:
 # --- Predictions and metrics ---
 print("[INFO] Generating predictions...")
 y_prob = model.predict(test_gen)
-y_pred = (y_prob > 0.5).astype(int).flatten()
+y_pred = np.array((y_prob > 0.5).astype(int).flatten())
 
-y_true = test_gen.classes
+y_true = np.array(test_gen.classes)
 labels = list(test_gen.class_indices.keys())
 
+y_true = np.array(y_true)
 print(f"[INFO] y_true shape: {y_true.shape}, y_pred shape: {y_pred.shape}")
 
 print("\n[INFO] Classification Report:")
