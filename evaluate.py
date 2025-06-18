@@ -83,7 +83,7 @@ print(classification_report(y_true, y_pred, target_names=labels))
 # --- Confusion matrix ---
 os.makedirs("logs", exist_ok=True)
 print("[INFO] Saving confusion matrix plot...")
-save_confusion_matrix(y_true, y_pred, labels, "logs/confusion_matrix.png")
+save_confusion_matrix(y_true, y_pred, labels, "../files_to_transfer/confusion_matrix.png")
 
 print(f"[INFO] Evaluation completed at: {datetime.now().isoformat()}")
 log_file.close()
