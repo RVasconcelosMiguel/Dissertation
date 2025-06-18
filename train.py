@@ -1,31 +1,29 @@
 import os
+import sys
+import pickle
+import numpy as np
+import tensorflow as tf
 
-# Set environment variables before importing TensorFlow
+# --- Environment Setup ---
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
-# Ensure required directories exist
+# --- Directory Setup ---
 os.makedirs("models", exist_ok=True)
 os.makedirs("/home/jtstudents/rmiguel/files_to_transfer", exist_ok=True)
 
-import sys
-
-# Redirect stdout and stderr to log file
+# --- Logging Setup ---
 log_path = "/home/jtstudents/rmiguel/files_to_transfer/train_log.txt"
 log_file = open(log_path, "w")
 sys.stdout = log_file
 sys.stderr = log_file
 
-import json
-import numpy as np
-import tensorflow as tf
-
-# --- TensorFlow info ---
+# --- TensorFlow Info ---
 print("TensorFlow version:", tf.__version__)
 print("GPU available:", tf.config.list_physical_devices('GPU'))
 print("Num GPUs:", len(tf.config.list_physical_devices('GPU')))
 
-# Configure GPU memory growth
+# --- GPU Memory Growth Configuration ---
 gpus = tf.config.list_physical_devices('GPU')
 if gpus:
     try:
@@ -37,14 +35,14 @@ if gpus:
 else:
     print("No GPU found — using CPU.")
 
-# --- Imports from project ---
+# --- Project Imports ---
 from model import build_model
 from data_loader import get_generators
 from plot_utils import plot_history
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 
-# --- Training configuration ---
+# --- Training Configuration ---
 IMG_SIZE = 224
 BATCH_SIZE = 32
 EPOCHS_HEAD = 15
@@ -53,34 +51,19 @@ LR_HEAD = 1e-4
 LR_FINE = 1e-5
 MODEL_PATH = "models/efficientnetb0_isic16.h5"
 
-# --- Safe history saving utility ---
-def make_json_serializable(obj):
-    if isinstance(obj, tf.Tensor):
-        return obj.numpy().tolist()
-    elif isinstance(obj, np.ndarray):
-        return obj.tolist()
-    elif isinstance(obj, (list, tuple)):
-        return [make_json_serializable(i) for i in obj]
-    elif isinstance(obj, dict):
-        return {k: make_json_serializable(v) for k, v in obj.items()}
-    elif isinstance(obj, (np.float32, np.float64, np.int64, np.int32)):
-        return obj.item()
-    else:
-        return obj
-
+# --- Save Training History using Pickle ---
 def save_history(history, filename):
     try:
-        history_dict = make_json_serializable(history.history)
-        with open(filename, "w") as f:
-            json.dump(history_dict, f, indent=2)
+        with open(filename, "wb") as f:
+            pickle.dump(history.history, f)
+        print(f"[DEBUG] History saved to {filename}")
     except Exception as e:
-        print(f"[ERROR] Failed to save history: {e}")
+        print(f"[ERROR] Could not save history using pickle: {e}")
 
-
-# --- Load data ---
+# --- Load Data ---
 train_gen, val_gen, test_gen = get_generators(img_size=IMG_SIZE, batch_size=BATCH_SIZE)
 
-# --- Build and compile model (head only) ---
+# --- Build and Compile Classification Head ---
 model, base_model = build_model(img_size=IMG_SIZE)
 model.summary()
 
@@ -92,10 +75,10 @@ model.compile(
 
 callbacks_head = [
     EarlyStopping(monitor="val_loss", patience=3, restore_best_weights=True),
-    ModelCheckpoint("models/efficientnetb0_head_best.h5", monitor="val_loss", save_best_only=True, save_weights_only=False)
+    ModelCheckpoint("models/efficientnetb0_head_best.h5", monitor="val_loss", save_best_only=True)
 ]
 
-# --- Train head ---
+# --- Train Classification Head ---
 print("Training classification head...")
 history_head = model.fit(
     train_gen,
@@ -103,11 +86,12 @@ history_head = model.fit(
     epochs=EPOCHS_HEAD,
     callbacks=callbacks_head
 )
+
 model.save("models/efficientnetb0_head_trained.h5")
 print("Saved model after head training.")
-save_history(history_head, "models/history_head.json")
+save_history(history_head, "models/history_head.pkl")
 
-# --- Fine-tune full model ---
+# --- Fine-tune Full Model ---
 print("Fine-tuning base model...")
 base_model.trainable = True
 for layer in base_model.layers[:100]:
@@ -126,7 +110,7 @@ model.compile(
 
 callbacks_fine = [
     EarlyStopping(monitor="val_loss", patience=3, restore_best_weights=True),
-    ModelCheckpoint(MODEL_PATH, monitor="val_loss", save_best_only=True, save_weights_only=False)
+    ModelCheckpoint(MODEL_PATH, monitor="val_loss", save_best_only=True)
 ]
 
 history_fine = model.fit(
@@ -135,9 +119,10 @@ history_fine = model.fit(
     epochs=EPOCHS_FINE,
     callbacks=callbacks_fine
 )
-save_history(history_fine, "models/history_fine.json")
 
-# --- Plot training history ---
+save_history(history_fine, "models/history_fine.pkl")
+
+# --- Plot History ---
 plot_history({
     "Head": history_head,
     "Fine": history_fine
