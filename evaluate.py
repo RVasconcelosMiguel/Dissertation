@@ -37,6 +37,7 @@ from model import build_model  # <--- add this
 from sklearn.metrics import classification_report
 from plot_utils import save_confusion_matrix
 import numpy as np
+from tensorflow.keras.models import load_model
 
 # --- Config ---
 IMG_SIZE = 224
@@ -47,11 +48,7 @@ if not os.path.isfile(MODEL_PATH):
     raise FileNotFoundError(f"[ERROR] Model not found at {MODEL_PATH}. Please verify training completion.")
 
 # --- Load model ---
-print("[INFO] Rebuilding model architecture...")
-model, base_model = build_model(img_size=IMG_SIZE)
-
-print(f"[INFO] Loading weights from {MODEL_PATH} ...")
-model.load_weights(MODEL_PATH)
+model = load_model("models/mobilenetv2_isic16.h5")
 
 # --- Load data ---
 print("[INFO] Preparing test generator...")
