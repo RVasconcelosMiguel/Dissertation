@@ -49,7 +49,7 @@ EPOCHS_HEAD = 15
 EPOCHS_FINE = 10
 LR_HEAD = 1e-4
 LR_FINE = 1e-5
-MODEL_PATH = "models/efficientnetb0_isic16.h5"
+MODEL_PATH = "models/mobilenetv2_isic16.h5"
 
 # --- Save Training History using Pickle ---
 def save_history(history, filename):
@@ -68,7 +68,7 @@ model, base_model = build_model(img_size=IMG_SIZE)
 model.summary()
 
 model.compile(
-    optimizer=Adam(LR_HEAD),
+    optimizer=Adam(learning_rate=float(LR_HEAD)),
     loss="binary_crossentropy",
     metrics=["accuracy"]
 )
@@ -83,9 +83,9 @@ history_head = model.fit(
     callbacks=callbacks_head
 )
 
-model.save("models/efficientnetb0_head_trained.h5")
+model.save("models/mobilenetv2_head_trained.h5")
 print("Saved model after head training.")
-save_history(history_head, "models/history_head.pkl")
+save_history(history_head, "models/history_mobilenetv2_head.pkl")
 
 # --- Fine-tune Full Model ---
 print("Fine-tuning base model...")
@@ -94,7 +94,7 @@ for layer in base_model.layers[:100]:
     layer.trainable = False
 
 model.compile(
-    optimizer=Adam(LR_FINE),
+    optimizer=Adam(learning_rate=float(LR_FINE)),
     loss="binary_crossentropy",
     metrics=[
         "accuracy",
@@ -116,7 +116,7 @@ history_fine = model.fit(
     callbacks=callbacks_fine
 )
 
-save_history(history_fine, "models/history_fine.pkl")
+save_history(history_fine, "models/history_mobilenetv2_fine.pkl")
 
 # --- Plot History ---
 plot_history({
