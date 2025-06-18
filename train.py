@@ -73,12 +73,8 @@ model.compile(
     metrics=["accuracy"]
 )
 
-callbacks_head = [
-    EarlyStopping(monitor="val_loss", patience=3, restore_best_weights=True),
-    ModelCheckpoint("models/efficientnetb0_head_best.h5", monitor="val_loss", save_best_only=True)
-]
+callbacks_head = []
 
-# --- Train Classification Head ---
 print("Training classification head...")
 history_head = model.fit(
     train_gen,
