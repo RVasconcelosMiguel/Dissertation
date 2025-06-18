@@ -33,10 +33,10 @@ else:
 
 # --- Project imports ---
 from data_loader import get_generators
+from model import build_model  # <--- add this
 from sklearn.metrics import classification_report
 from plot_utils import save_confusion_matrix
 import numpy as np
-from tensorflow.keras.models import load_model  # <-- Import here
 
 # --- Config ---
 IMG_SIZE = 224
