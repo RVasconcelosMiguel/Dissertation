@@ -5,6 +5,8 @@ import numpy as np
 import tensorflow as tf
 from collections import Counter
 
+from tensorflow.keras import backend as K  # NEW IMPORT for focal loss
+
 # --- Environment Setup ---
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
@@ -55,6 +57,21 @@ LR_HEAD = 1e-4
 LR_FINE = 1e-5
 MODEL_PATH = "models/mobilenetv2_isic16.h5"
 
+# --- Focal Loss Definition ---
+def focal_loss(gamma=2.0, alpha=0.25):
+    def focal_loss_fixed(y_true, y_pred):
+        epsilon = K.epsilon()
+        y_pred = K.clip(y_pred, epsilon, 1. - epsilon)
+
+        pt_1 = tf.where(K.equal(y_true, 1), y_pred, K.ones_like(y_pred))
+        pt_0 = tf.where(K.equal(y_true, 0), y_pred, K.zeros_like(y_pred))
+
+        return -K.mean(alpha * K.pow(1. - pt_1, gamma) * K.log(pt_1)) \
+               -K.mean((1 - alpha) * K.pow(pt_0, gamma) * K.log(1. - pt_0))
+    return focal_loss_fixed
+
+print("[INFO] Using Focal Loss with alpha=0.25, gamma=2.0")
+
 # --- Save Training History using Pickle ---
 def save_history(history, filename):
     try:
@@ -86,7 +103,7 @@ model.summary()
 
 model.compile(
     optimizer=Adam(learning_rate=float(LR_HEAD)),
-    loss="binary_crossentropy",
+    loss=focal_loss(gamma=2.0, alpha=0.25),
     metrics=["accuracy"]
 )
 
@@ -98,7 +115,7 @@ history_head = model.fit(
     validation_data=val_gen,
     epochs=EPOCHS_HEAD,
     callbacks=callbacks_head,
-    class_weight=class_weights  
+    class_weight=class_weights
 )
 
 model.save("models/mobilenetv2_head_trained.h5")
@@ -113,7 +130,7 @@ for layer in base_model.layers[:100]:
 
 model.compile(
     optimizer=Adam(learning_rate=float(LR_FINE)),
-    loss="binary_crossentropy",
+    loss=focal_loss(gamma=2.0, alpha=0.25),
     metrics=[
         "accuracy",
         tf.keras.metrics.AUC(name="auc"),
@@ -132,7 +149,7 @@ history_fine = model.fit(
     validation_data=val_gen,
     epochs=EPOCHS_FINE,
     callbacks=callbacks_fine,
-    class_weight=class_weights  #added
+    class_weight=class_weights
 )
 
 save_history(history_fine, "models/history_mobilenetv2_fine.pkl")
