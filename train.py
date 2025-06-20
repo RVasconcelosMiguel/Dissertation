@@ -5,8 +5,6 @@ import numpy as np
 import tensorflow as tf
 from collections import Counter
 
-from tensorflow.keras import backend as K  # NEW IMPORT for focal loss
-
 # --- Environment Setup ---
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
@@ -27,7 +25,6 @@ sys.stderr = log_file
 # --- TensorFlow Info ---
 print("TensorFlow version:", tf.__version__)
 print("GPU available:", tf.config.list_physical_devices('GPU'))
-print("Num GPUs:", len(tf.config.list_physical_devices('GPU')))
 
 # --- GPU Memory Growth Configuration ---
 gpus = tf.config.list_physical_devices('GPU')
@@ -47,6 +44,7 @@ from data_loader import get_generators
 from plot_utils import plot_history
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
+from tensorflow.keras import backend as K
 
 # --- Training Configuration ---
 IMG_SIZE = 224
@@ -57,22 +55,7 @@ LR_HEAD = 1e-4
 LR_FINE = 1e-5
 MODEL_PATH = "models/mobilenetv2_isic16.h5"
 
-# --- Focal Loss Definition ---
-def focal_loss(gamma=2.0, alpha=0.25):
-    def focal_loss_fixed(y_true, y_pred):
-        epsilon = K.epsilon()
-        y_pred = K.clip(y_pred, epsilon, 1. - epsilon)
-
-        pt_1 = tf.where(K.equal(y_true, 1), y_pred, K.ones_like(y_pred))
-        pt_0 = tf.where(K.equal(y_true, 0), y_pred, K.zeros_like(y_pred))
-
-        return -K.mean(alpha * K.pow(1. - pt_1, gamma) * K.log(pt_1)) \
-               -K.mean((1 - alpha) * K.pow(pt_0, gamma) * K.log(1. - pt_0))
-    return focal_loss_fixed
-
-print("[INFO] Using Focal Loss with alpha=0.25, gamma=2.0")
-
-# --- Save Training History using Pickle ---
+# --- Save Training History ---
 def save_history(history, filename):
     try:
         with open(filename, "wb") as f:
@@ -92,6 +75,19 @@ def compute_class_weights(generator):
     }
     print(f"[INFO] Computed class weights: {class_weights}")
     return class_weights
+
+# --- Define Focal Loss ---
+def focal_loss(gamma=2.0, alpha=0.25):
+    def focal_loss_fixed(y_true, y_pred):
+        epsilon = K.epsilon()
+        y_pred = K.clip(y_pred, epsilon, 1. - epsilon)
+
+        pt_1 = tf.where(K.equal(y_true, 1), y_pred, K.ones_like(y_pred))
+        pt_0 = tf.where(K.equal(y_true, 0), y_pred, K.zeros_like(y_pred))
+
+        return -K.mean(alpha * K.pow(1. - pt_1, gamma) * K.log(pt_1)) \
+               -K.mean((1 - alpha) * K.pow(pt_0, gamma) * K.log(1. - pt_0))
+    return focal_loss_fixed
 
 # --- Load Data ---
 train_gen, val_gen, test_gen = get_generators(img_size=IMG_SIZE, batch_size=BATCH_SIZE)

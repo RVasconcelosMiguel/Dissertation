@@ -1,6 +1,7 @@
 import os
 import sys
 from datetime import datetime
+from train import focal_loss
 
 # --- Environment config ---
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -50,7 +51,7 @@ if not os.path.isfile(MODEL_PATH):
     raise FileNotFoundError(f"[ERROR] Model not found at {MODEL_PATH}. Please verify training completion.")
 
 # --- Load model ---
-model = load_model("models/mobilenetv2_isic16.h5")
+model = load_model("models/mobilenetv2_isic16.h5", custom_objects={"focal_loss_fixed": focal_loss(gamma=2.0, alpha=0.25)})
 
 # --- Load data ---
 print("[INFO] Preparing test generator...")
