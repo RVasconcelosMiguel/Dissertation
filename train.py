@@ -46,8 +46,8 @@ from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 # --- Training Configuration ---
 IMG_SIZE = 224
 BATCH_SIZE = 32
-EPOCHS_HEAD = 30  # doubled from 15
-EPOCHS_FINE = 20  # doubled from 10
+EPOCHS_HEAD = 50
+EPOCHS_FINE = 50 
 LR_HEAD = 1e-4
 LR_FINE = 1e-5
 MODEL_PATH = "models/mobilenetv2_isic16.h5"
