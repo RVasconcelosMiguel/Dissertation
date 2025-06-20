@@ -43,16 +43,16 @@ from model import build_model
 from data_loader import get_generators
 from plot_utils import plot_history
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
 from tensorflow.keras import backend as K
 
 # --- Training Configuration ---
 IMG_SIZE = 224
 BATCH_SIZE = 32
 EPOCHS_HEAD = 50
-EPOCHS_FINE = 50 
+EPOCHS_FINE = 50
 LR_HEAD = 1e-4
-LR_FINE = 1e-5
+LR_FINE = 1e-6
 MODEL_PATH = "models/mobilenetv2_isic16.h5"
 
 # --- Save Training History ---
@@ -77,14 +77,12 @@ def compute_class_weights(generator):
     return class_weights
 
 # --- Define Focal Loss ---
-def focal_loss(gamma=2.0, alpha=0.25):
+def focal_loss(gamma=1.5, alpha=0.5):
     def focal_loss_fixed(y_true, y_pred):
         epsilon = K.epsilon()
         y_pred = K.clip(y_pred, epsilon, 1. - epsilon)
-
         pt_1 = tf.where(K.equal(y_true, 1), y_pred, K.ones_like(y_pred))
         pt_0 = tf.where(K.equal(y_true, 0), y_pred, K.zeros_like(y_pred))
-
         return -K.mean(alpha * K.pow(1. - pt_1, gamma) * K.log(pt_1)) \
                -K.mean((1 - alpha) * K.pow(pt_0, gamma) * K.log(1. - pt_0))
     return focal_loss_fixed
@@ -98,19 +96,16 @@ model, base_model = build_model(img_size=IMG_SIZE)
 model.summary()
 
 model.compile(
-    optimizer=Adam(learning_rate=float(LR_HEAD)),
-    loss=focal_loss(gamma=2.0, alpha=0.25),
+    optimizer=Adam(learning_rate=LR_HEAD),
+    loss=focal_loss(gamma=1.5, alpha=0.5),
     metrics=["accuracy"]
 )
-
-callbacks_head = []
 
 print("Training classification head...")
 history_head = model.fit(
     train_gen,
     validation_data=val_gen,
     epochs=EPOCHS_HEAD,
-    callbacks=callbacks_head,
     class_weight=class_weights
 )
 
@@ -120,13 +115,11 @@ save_history(history_head, "models/history_mobilenetv2_head.pkl")
 
 # --- Fine-tune Full Model ---
 print("Fine-tuning base model...")
-base_model.trainable = True
-for layer in base_model.layers[:100]:
-    layer.trainable = False
+base_model.trainable = True  # Unfreeze entire base model
 
 model.compile(
-    optimizer=Adam(learning_rate=float(LR_FINE)),
-    loss=focal_loss(gamma=2.0, alpha=0.25),
+    optimizer=Adam(learning_rate=LR_FINE),
+    loss=focal_loss(gamma=1.5, alpha=0.5),
     metrics=[
         "accuracy",
         tf.keras.metrics.AUC(name="auc"),
@@ -137,7 +130,8 @@ model.compile(
 
 callbacks_fine = [
     EarlyStopping(monitor="val_loss", patience=10, restore_best_weights=True),
-    ModelCheckpoint(MODEL_PATH, monitor="val_loss", save_best_only=True)
+    ModelCheckpoint(MODEL_PATH, monitor="val_loss", save_best_only=True),
+    ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=5, min_lr=1e-7, verbose=1)
 ]
 
 history_fine = model.fit(
