@@ -9,12 +9,15 @@ from collections import Counter
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
+output_dir = "/home/jtstudents/rmiguel/files_to_transfer"
+
 # --- Directory Setup ---
 os.makedirs("models", exist_ok=True)
-os.makedirs("/home/jtstudents/rmiguel/files_to_transfer", exist_ok=True)
+os.makedirs(output_dir, exist_ok=True)
 
 # --- Logging Setup ---
-log_path = "/home/jtstudents/rmiguel/files_to_transfer/train_log.txt"
+log_filename = "train_log.txt"
+log_path = os.path.join(output_dir, log_filename)
 log_file = open(log_path, "w")
 sys.stdout = log_file
 sys.stderr = log_file
@@ -135,10 +138,11 @@ history_fine = model.fit(
 save_history(history_fine, "models/history_mobilenetv2_fine.pkl")
 
 # --- Plot History ---
-plot_history({
-    "Head": history_head,
-    "Fine": history_fine
-})
+plot_history(
+    histories={"Head": history_head, "Fine": history_fine},
+    save_path=output_dir,
+    metrics=["loss", "accuracy", "auc"]
+)
 
 print("Training complete.")
 log_file.close()

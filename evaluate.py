@@ -7,10 +7,12 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 # Create necessary directories
-os.makedirs("/home/jtstudents/rmiguel/files_to_transfer", exist_ok=True)
+output_dir = "/home/jtstudents/rmiguel/files_to_transfer"
+os.makedirs(output_dir, exist_ok=True)
 
 # --- Logging setup ---
-log_path = "/home/jtstudents/rmiguel/files_to_transfer/evaluate_log.txt"
+log_filename = "evaluate_log.txt"
+log_path = os.path.join(output_dir, log_filename)
 log_file = open(log_path, "w")
 sys.stdout = log_file
 sys.stderr = log_file
@@ -35,7 +37,7 @@ else:
 from data_loader import get_generators
 from model import build_model  # <--- add this
 from sklearn.metrics import classification_report
-from plot_utils import save_confusion_matrix
+from plot_utils import save_confusion_matrix, save_roc_curve
 import numpy as np
 from tensorflow.keras.models import load_model
 
@@ -81,9 +83,16 @@ print("\n[INFO] Classification Report:")
 print(classification_report(y_true, y_pred, target_names=labels))
 
 # --- Confusion matrix ---
-os.makedirs("logs", exist_ok=True)
 print("[INFO] Saving confusion matrix plot...")
-save_confusion_matrix(y_true, y_pred, labels, "../files_to_transfer/confusion_matrix.png")
+confusion_matrix_filename = "confusion_matrix.png"
+confusion_matrix_path = os.path.join(output_dir, confusion_matrix_filename)
+save_confusion_matrix(y_true, y_pred, labels, confusion_matrix_path)
+
+# --- ROC curve ---
+roc_filename = "roc_curve.png"
+roc_path = os.path.join(output_dir, roc_filename)
+print("[INFO] Saving ROC curve plot...")
+save_roc_curve(y_true, y_prob.flatten(), roc_path)
 
 print(f"[INFO] Evaluation completed at: {datetime.now().isoformat()}")
 log_file.close()
