@@ -3,6 +3,7 @@ import sys
 import pickle
 import numpy as np
 import tensorflow as tf
+from collections import Counter
 
 # --- Environment Setup ---
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -45,8 +46,8 @@ from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 # --- Training Configuration ---
 IMG_SIZE = 224
 BATCH_SIZE = 32
-EPOCHS_HEAD = 15
-EPOCHS_FINE = 10
+EPOCHS_HEAD = 30  # doubled from 15
+EPOCHS_FINE = 20  # doubled from 10
 LR_HEAD = 1e-4
 LR_FINE = 1e-5
 MODEL_PATH = "models/mobilenetv2_isic16.h5"
@@ -60,8 +61,21 @@ def save_history(history, filename):
     except Exception as e:
         print(f"[ERROR] Could not save history using pickle: {e}")
 
+# --- Compute Class Weights ---
+def compute_class_weights(generator):
+    labels = generator.classes
+    counts = Counter(labels)
+    total = sum(counts.values())
+    class_weights = {
+        0: total / (2.0 * counts[0]),
+        1: total / (2.0 * counts[1])
+    }
+    print(f"[INFO] Computed class weights: {class_weights}")
+    return class_weights
+
 # --- Load Data ---
 train_gen, val_gen, test_gen = get_generators(img_size=IMG_SIZE, batch_size=BATCH_SIZE)
+class_weights = compute_class_weights(train_gen)
 
 # --- Build and Compile Classification Head ---
 model, base_model = build_model(img_size=IMG_SIZE)
@@ -80,7 +94,8 @@ history_head = model.fit(
     train_gen,
     validation_data=val_gen,
     epochs=EPOCHS_HEAD,
-    callbacks=callbacks_head
+    callbacks=callbacks_head,
+    class_weight=class_weights  # dded
 )
 
 model.save("models/mobilenetv2_head_trained.h5")
@@ -113,7 +128,8 @@ history_fine = model.fit(
     train_gen,
     validation_data=val_gen,
     epochs=EPOCHS_FINE,
-    callbacks=callbacks_fine
+    callbacks=callbacks_fine,
+    class_weight=class_weights  #added
 )
 
 save_history(history_fine, "models/history_mobilenetv2_fine.pkl")
