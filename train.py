@@ -113,10 +113,22 @@ model.save("models/mobilenetv2_head_trained.h5")
 print("Saved model after head training.")
 save_history(history_head, "models/history_mobilenetv2_head.pkl")
 
-# --- Fine-tune Full Model ---
-print("Fine-tuning base model...")
-base_model.trainable = True  # Unfreeze entire base model
+# --- Fine-tune Deeper Layers of Base Model ---
+print("Fine-tuning base model (partial unfreezing)...")
 
+# Unfreeze last 50 layers of the base model
+UNFREEZE_FROM_LAYER = 100  # MobileNetV2 has 155 layers
+total_layers = len(base_model.layers)
+print(f"Total layers in base model: {total_layers}")
+
+for layer in base_model.layers[:UNFREEZE_FROM_LAYER]:
+    layer.trainable = False
+for layer in base_model.layers[UNFREEZE_FROM_LAYER:]:
+    layer.trainable = True
+
+print(f"Unfroze layers from {UNFREEZE_FROM_LAYER} to {total_layers}")
+
+# Recompile with low learning rate
 model.compile(
     optimizer=Adam(learning_rate=LR_FINE),
     loss=focal_loss(gamma=1.5, alpha=0.5),
@@ -143,13 +155,3 @@ history_fine = model.fit(
 )
 
 save_history(history_fine, "models/history_mobilenetv2_fine.pkl")
-
-# --- Plot History ---
-plot_history(
-    histories={"Head": history_head, "Fine": history_fine},
-    save_path=output_dir,
-    metrics=["loss", "accuracy", "auc"]
-)
-
-print("Training complete.")
-log_file.close()
