@@ -120,7 +120,7 @@ model.compile(
 )
 
 callbacks_fine = [
-    EarlyStopping(monitor="val_accuracy", patience=5, restore_best_weights=True),
+    EarlyStopping(monitor="val_loss", patience=10, restore_best_weights=True),
     ModelCheckpoint(MODEL_PATH, monitor="val_loss", save_best_only=True)
 ]
 
