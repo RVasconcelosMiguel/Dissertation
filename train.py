@@ -95,7 +95,7 @@ history_head = model.fit(
     validation_data=val_gen,
     epochs=EPOCHS_HEAD,
     callbacks=callbacks_head,
-    class_weight=class_weights  # dded
+    class_weight=class_weights  
 )
 
 model.save("models/mobilenetv2_head_trained.h5")
@@ -120,7 +120,7 @@ model.compile(
 )
 
 callbacks_fine = [
-    EarlyStopping(monitor="val_loss", patience=3, restore_best_weights=True),
+    EarlyStopping(monitor="val_accuracy", patience=5, restore_best_weights=True),
     ModelCheckpoint(MODEL_PATH, monitor="val_loss", save_best_only=True)
 ]
 
