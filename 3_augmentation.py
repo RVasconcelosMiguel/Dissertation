@@ -9,16 +9,16 @@ output_folder = '/raid/DATASETS/rmiguel_datasets/ISIC16/Augmented_Training_Data'
 
 assert "rmiguel_datasets" in output_folder, "Unsafe output path. Aborting!"
 
-# Prepare output folder
+# Clear output folder if exists
 if os.path.exists(output_folder):
-    print(f"Folder {output_folder} exists. Deleting...")
+    print(f"Folder {output_folder} exists, deleting it...")
     shutil.rmtree(output_folder)
 os.makedirs(output_folder, exist_ok=True)
 
-# Get list of classes (subfolders)
+# 1. List classes (subfolders)
 classes = [d for d in os.listdir(input_folder) if os.path.isdir(os.path.join(input_folder, d))]
 
-# Count images per class
+# 2. Count images per class
 class_counts = {}
 for cls in classes:
     cls_path = os.path.join(input_folder, cls)
@@ -28,7 +28,8 @@ for cls in classes:
 max_count = max(class_counts.values())
 
 print("Class counts before augmentation:")
-print(class_counts)
+for cls, cnt in class_counts.items():
+    print(f"{cls}: {cnt}")
 
 def random_augment(img):
     if random.random() < 0.5:
@@ -38,7 +39,7 @@ def random_augment(img):
     angle = random.uniform(-30, 30)
     return img.rotate(angle)
 
-# Copy originals and augment minority classes
+# 3. Copy originals and augment minority classes
 for cls in classes:
     src_cls_path = os.path.join(input_folder, cls)
     dst_cls_path = os.path.join(output_folder, cls)
@@ -48,10 +49,10 @@ for cls in classes:
     count = class_counts[cls]
 
     # Copy original images
-    for img_name in tqdm(images, desc=f"Copy originals for class {cls}"):
+    for img_name in tqdm(images, desc=f"Copy originals for {cls}"):
         shutil.copy2(os.path.join(src_cls_path, img_name), os.path.join(dst_cls_path, img_name))
 
-    # Determine how many times to augment each image
+    # If minority class, augment
     if count < max_count:
         augment_times = max_count // count - 1
         print(f"Augmenting class '{cls}' {augment_times} times per image.")
@@ -64,6 +65,7 @@ for cls in classes:
             for i in range(augment_times):
                 aug_img = random_augment(img.copy())
                 aug_filename = f"{base_name}_aug_{i}.jpg"
-                aug_img.save(os.path.join(dst_cls_path, aug_filename))
+                save_path = os.path.join(dst_cls_path, aug_filename)
+                aug_img.save(save_path)
 
 print("Augmentation complete.")
