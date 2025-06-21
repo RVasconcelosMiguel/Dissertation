@@ -49,35 +49,35 @@ for key in input_folders:
     original_folder = input_folders[key]
     processed_folder = output_folders[key]
 
-    # Segurança: prevenir apagamento errado
-    assert "rmiguel_datasets" in processed_folder, "Caminho de output inseguro! Abortado."
+    # Safety: prevent accidental deletion of important paths
+    assert "rmiguel_datasets" in processed_folder, "Unsafe output path! Aborting."
 
-    # Criar output directory
+    # Create output directory
     if os.path.exists(processed_folder):
-        print(f"⚠️ A pasta {processed_folder} já existe. Vai ser apagada e substituída.")
+        print(f"Folder {processed_folder} already exists. It will be deleted and replaced.")
         shutil.rmtree(processed_folder)
     os.makedirs(processed_folder, exist_ok=True)
 
     all_images = [f for f in os.listdir(original_folder) if f.endswith('.jpg')]
 
-    for image_name in tqdm(all_images, desc=f"Processando {key}"):
+    for image_name in tqdm(all_images, desc=f"Processing {key}"):
         img_path = os.path.join(original_folder, image_name)
         processed_path = os.path.join(processed_folder, image_name)
 
-        # Carregar imagem
+        # Load image
         img_bgr = cv2.imread(img_path)
         if img_bgr is None:
-            print(f"Erro ao carregar: {img_path}")
+            print(f"Error loading: {img_path}")
             continue
 
         img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
 
-        # Pré-processamento
+        # Preprocessing pipeline
         img_rgb = remove_hairs(img_rgb)
-        # img_rgb = apply_clahe_rgb(img_rgb)             # Opcional
-        # img_rgb = normalize_illumination(img_rgb)      # Opcional
+        # img_rgb = apply_clahe_rgb(img_rgb)             # Optional
+        # img_rgb = normalize_illumination(img_rgb)      # Optional
 
-        # Afinação de canais
+        # Channel sharpening
         img_pil = Image.fromarray(img_rgb)
         r, g, b = img_pil.split()
         r = sharpen_channel_pil(r)
@@ -85,8 +85,8 @@ for key in input_folders:
         b = sharpen_channel_pil(b)
         img_sharp = Image.merge('RGB', (r, g, b))
 
-        # Redimensionar e guardar
+        # Resize and save
         img_resized = img_sharp.resize((224, 224), Image.BICUBIC)
         img_resized.save(processed_path)
 
-    print(f"{key.upper()}: {len(all_images)} imagens processadas.")
+    print(f"{key.upper()}: {len(all_images)} images processed.")
