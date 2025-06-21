@@ -9,3 +9,5 @@ echo "=== TRAINING ==="
 python train.py
 echo "=== EVALUATION ==="
 python evaluate.py
+echo "=== THRESHOLD TUNING (ROC-based) ==="
+python threshold_tuning.py
