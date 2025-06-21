@@ -52,7 +52,7 @@ BATCH_SIZE = 32
 EPOCHS_HEAD = 50
 EPOCHS_FINE = 50
 LR_HEAD = 1e-4
-LR_FINE = 1e-6
+LR_FINE = 3e-5
 MODEL_PATH = "models/mobilenetv2_isic16.h5"
 
 # --- Dataset Configuration ---
@@ -132,7 +132,7 @@ save_history(history_head, "models/history_mobilenetv2_head.pkl")
 # --- Fine-tune Deeper Layers of Base Model ---
 print("Fine-tuning base model (partial unfreezing)...")
 
-UNFREEZE_FROM_LAYER = 100  # MobileNetV2 has 155 layers
+UNFREEZE_FROM_LAYER = 75  # instead of 100
 total_layers = len(base_model.layers)
 print(f"Total layers in base model: {total_layers}")
 
@@ -155,9 +155,9 @@ model.compile(
 )
 
 callbacks_fine = [
-    EarlyStopping(monitor="val_loss", patience=10, restore_best_weights=True),
+    EarlyStopping(monitor="val_loss", patience=15, restore_best_weights=True),
     ModelCheckpoint(MODEL_PATH, monitor="val_loss", save_best_only=True),
-    ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=5, min_lr=1e-7, verbose=1)
+    ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=7, min_lr=1e-7, verbose=1)
 ]
 
 history_fine = model.fit(
