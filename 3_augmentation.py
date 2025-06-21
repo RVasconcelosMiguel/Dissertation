@@ -1,71 +1,96 @@
 import os
-import shutil
 import random
+import shutil
+import pandas as pd
 from PIL import Image, ImageOps
 from tqdm import tqdm
 
-input_folder = '/raid/DATASETS/rmiguel_datasets/ISIC16/Preprocessed_Training_Data'
-output_folder = '/raid/DATASETS/rmiguel_datasets/ISIC16/Augmented_Training_Data'
+# === Caminhos ===
+df_path = "/raid/DATASETS/rmiguel_datasets/ISIC16/CSV/Training_labels.csv"
+preprocessed_folder = "/raid/DATASETS/rmiguel_datasets/ISIC16/Preprocessed_Training_Data"
+augmented_folder = "/raid/DATASETS/rmiguel_datasets/ISIC16/Augmented_Training_Data"
 
-assert "rmiguel_datasets" in output_folder, "Unsafe output path. Aborting!"
+# === Segurança de caminho ===
+assert "rmiguel_datasets" in augmented_folder, "Caminho de output inseguro! Abortado."
 
-# Clear output folder if exists
-if os.path.exists(output_folder):
-    print(f"Folder {output_folder} exists, deleting it...")
-    shutil.rmtree(output_folder)
-os.makedirs(output_folder, exist_ok=True)
+# === Criar pasta de output ===
+if os.path.exists(augmented_folder):
+    print(f"⚠️ A pasta {augmented_folder} já existe. Vai ser apagada.")
+    shutil.rmtree(augmented_folder)
+os.makedirs(augmented_folder, exist_ok=True)
 
-# 1. List classes (subfolders)
-classes = [d for d in os.listdir(input_folder) if os.path.isdir(os.path.join(input_folder, d))]
+# === Carregar DataFrame ===
+df = pd.read_csv(df_path, header=None, names=["image", "label"])
 
-# 2. Count images per class
-class_counts = {}
-for cls in classes:
-    cls_path = os.path.join(input_folder, cls)
-    images = [f for f in os.listdir(cls_path) if f.lower().endswith('.jpg')]
-    class_counts[cls] = len(images)
+# Garantir que nomes terminam com .jpg
+df['image'] = df['image'].astype(str).apply(lambda x: x if x.endswith('.jpg') else x + '.jpg')
 
-max_count = max(class_counts.values())
+# Mapear 'benign' e 'malignant' para 0/1 se necessário
+if df['label'].dtype == object:
+    df['label'] = df['label'].map({'benign': '0', 'malignant': '1'}).astype(str)
 
-print("Class counts before augmentation:")
-for cls, cnt in class_counts.items():
-    print(f"{cls}: {cnt}")
+# Copiar imagens originais para pasta de output
+for img_file in os.listdir(preprocessed_folder):
+    src = os.path.join(preprocessed_folder, img_file)
+    dst = os.path.join(augmented_folder, img_file)
+    shutil.copy2(src, dst)
 
-def random_augment(img):
-    if random.random() < 0.5:
-        img = ImageOps.mirror(img)
-    if random.random() < 0.5:
-        img = ImageOps.flip(img)
-    angle = random.uniform(-30, 30)
-    return img.rotate(angle)
+# === Contagem por classe ===
+label_counts = df['label'].value_counts()
+max_count = label_counts.max()
 
-# 3. Copy originals and augment minority classes
-for cls in classes:
-    src_cls_path = os.path.join(input_folder, cls)
-    dst_cls_path = os.path.join(output_folder, cls)
-    os.makedirs(dst_cls_path, exist_ok=True)
+print("Distribuição inicial das classes:")
+print(label_counts)
 
-    images = [f for f in os.listdir(src_cls_path) if f.lower().endswith('.jpg')]
-    count = class_counts[cls]
+# === Augmentação ===
+new_rows = []
 
-    # Copy original images
-    for img_name in tqdm(images, desc=f"Copy originals for {cls}"):
-        shutil.copy2(os.path.join(src_cls_path, img_name), os.path.join(dst_cls_path, img_name))
+for cls, count in label_counts.items():
+    if count >= max_count:
+        print(f"Classe '{cls}' já está balanceada. Ignorada.")
+        continue
 
-    # If minority class, augment
-    if count < max_count:
-        augment_times = max_count // count - 1
-        print(f"Augmenting class '{cls}' {augment_times} times per image.")
+    samples = df[df['label'] == cls]
+    augment_times = (max_count - count) // count
+    print(f"Classe '{cls}': Aumentando {augment_times}x cada amostra.")
 
-        for img_name in tqdm(images, desc=f"Augmenting class {cls}"):
-            img_path = os.path.join(src_cls_path, img_name)
+    for _, row in tqdm(samples.iterrows(), total=len(samples), desc=f"Augmentando classe {cls}"):
+        img_name = row['image']
+        img_path = os.path.join(preprocessed_folder, img_name)
+
+        try:
             img = Image.open(img_path)
-            base_name = img_name[:-4]
+        except Exception as e:
+            print(f"Erro ao abrir {img_path}: {e}")
+            continue
 
-            for i in range(augment_times):
-                aug_img = random_augment(img.copy())
-                aug_filename = f"{base_name}_aug_{i}.jpg"
-                save_path = os.path.join(dst_cls_path, aug_filename)
-                aug_img.save(save_path)
+        for i in range(augment_times):
+            aug_img = img.copy()
 
-print("Augmentation complete.")
+            # Transformações simples
+            if random.random() < 0.5:
+                aug_img = ImageOps.mirror(aug_img)
+            if random.random() < 0.5:
+                aug_img = ImageOps.flip(aug_img)
+
+            angle = random.uniform(-30, 30)
+            aug_img = aug_img.rotate(angle)
+
+            # Salvar com nome único
+            base = os.path.splitext(img_name)[0]
+            new_name = f"{base}_aug_{i}.jpg"
+            save_path = os.path.join(augmented_folder, new_name)
+            aug_img.save(save_path)
+
+            new_rows.append({'image': new_name, 'label': cls})
+
+# === Gerar DataFrame final ===
+df_aug = pd.concat([df, pd.DataFrame(new_rows)], ignore_index=True)
+
+print(f"\nTotal de imagens após augmentação: {len(df_aug)}")
+print(df_aug['label'].value_counts())
+
+# === (Opcional) Salvar novo CSV ===
+out_csv = "/raid/DATASETS/rmiguel_datasets/ISIC16/CSV/Augmented_Training_labels.csv"
+df_aug.to_csv(out_csv, index=False, header=False)
+print(f"Novo CSV salvo em: {out_csv}")
