@@ -56,7 +56,7 @@ LR_FINE = 3e-5
 MODEL_PATH = "models/mobilenetv2_isic16.h5"
 
 # --- Dataset Configuration ---
-TRAIN_CSV_NAME = "Augmented_Training_labels.csv"  # or "Training_labels.csv"
+TRAIN_CSV_NAME = "Augmented_Training_labels.csv"
 
 # --- Class Distribution Output ---
 def print_distribution(name, df):
@@ -89,7 +89,7 @@ def compute_class_weights(generator):
     return class_weights
 
 # --- Define Focal Loss ---
-def focal_loss(gamma=1.5, alpha=0.5):
+def focal_loss(gamma=2.0, alpha=0.75):
     def focal_loss_fixed(y_true, y_pred):
         epsilon = K.epsilon()
         y_pred = K.clip(y_pred, epsilon, 1. - epsilon)
@@ -113,7 +113,7 @@ model.summary()
 
 model.compile(
     optimizer=Adam(learning_rate=LR_HEAD),
-    loss=focal_loss(gamma=1.5, alpha=0.5),
+    loss=focal_loss(gamma=2.0, alpha=0.75),
     metrics=["accuracy"]
 )
 
@@ -129,10 +129,10 @@ model.save("models/mobilenetv2_head_trained.h5")
 print("Saved model after head training.")
 save_history(history_head, "models/history_mobilenetv2_head.pkl")
 
-# --- Fine-tune Deeper Layers of Base Model ---
+# --- Fine-tune Base Model ---
 print("Fine-tuning base model (partial unfreezing)...")
 
-UNFREEZE_FROM_LAYER = 75  # instead of 100
+UNFREEZE_FROM_LAYER = 75
 total_layers = len(base_model.layers)
 print(f"Total layers in base model: {total_layers}")
 
@@ -145,7 +145,7 @@ print(f"Unfroze layers from {UNFREEZE_FROM_LAYER} to {total_layers}")
 
 model.compile(
     optimizer=Adam(learning_rate=LR_FINE),
-    loss=focal_loss(gamma=1.5, alpha=0.5),
+    loss=focal_loss(gamma=2.0, alpha=0.75),
     metrics=[
         "accuracy",
         tf.keras.metrics.AUC(name="auc"),
@@ -155,9 +155,9 @@ model.compile(
 )
 
 callbacks_fine = [
-    EarlyStopping(monitor="val_loss", patience=15, restore_best_weights=True),
-    ModelCheckpoint(MODEL_PATH, monitor="val_loss", save_best_only=True),
-    ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=7, min_lr=1e-7, verbose=1)
+    EarlyStopping(monitor="val_recall", mode="max", patience=15, restore_best_weights=True),
+    ModelCheckpoint(MODEL_PATH, monitor="val_recall", mode="max", save_best_only=True),
+    ReduceLROnPlateau(monitor="val_recall", mode="max", factor=0.5, patience=7, min_lr=1e-7, verbose=1)
 ]
 
 history_fine = model.fit(
@@ -177,5 +177,5 @@ plot_history(
         "Fine": history_fine
     },
     save_path=output_dir,
-    metrics=["accuracy", "loss", "auc"]
+    metrics=["accuracy", "loss", "auc", "recall"]
 )
