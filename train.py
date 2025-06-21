@@ -169,3 +169,13 @@ history_fine = model.fit(
 )
 
 save_history(history_fine, "models/history_mobilenetv2_fine.pkl")
+
+# --- Plot Training Curves ---
+plot_history(
+    histories={
+        "Head": history_head,
+        "Fine": history_fine
+    },
+    save_path=output_dir,
+    metrics=["accuracy", "loss", "auc"]
+)
