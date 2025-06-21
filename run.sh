@@ -6,8 +6,8 @@ conda activate rm_dermo_env
 
 # Run the training and evaluation scripts
 echo "=== TRAINING ==="
-python train.py
+#python train.py
 echo "=== EVALUATION ==="
-python evaluate.py
+#python evaluate.py
 echo "=== THRESHOLD TUNING (ROC-based) ==="
 python threshold_tuning.py
