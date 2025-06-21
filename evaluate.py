@@ -20,6 +20,8 @@ sys.stderr = log_file
 
 print(f"[INFO] Evaluation started at: {datetime.now().isoformat()}")
 
+TRAIN_CSV_NAME = "Augmented_Training_labels.csv"  # or "Training_labels.csv"
+
 # --- TensorFlow config ---
 import tensorflow as tf
 gpus = tf.config.list_physical_devices('GPU')
@@ -55,7 +57,7 @@ model = load_model("models/mobilenetv2_isic16.h5", custom_objects={"focal_loss_f
 
 # --- Load data ---
 print("[INFO] Preparing test generator...")
-_, _, test_gen = get_generators(img_size=IMG_SIZE, batch_size=BATCH_SIZE)
+_, _, test_gen = get_generators(train_csv_name=TRAIN_CSV_NAME, img_size=IMG_SIZE, batch_size=BATCH_SIZE)
 
 if hasattr(test_gen, 'shuffle') and test_gen.shuffle:
     print("[WARNING] Test generator is shuffled — this may desynchronize labels and predictions.")
