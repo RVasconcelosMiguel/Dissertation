@@ -20,7 +20,7 @@ sys.stderr = log_file
 
 print(f"[INFO] Evaluation started at: {datetime.now().isoformat()}")
 
-TRAIN_CSV_NAME = "Augmented_Training_labels.csv"  # or "Training_labels.csv"
+TRAIN_CSV_NAME = "Augmented_Training_labels.csv"
 
 # --- TensorFlow config ---
 import tensorflow as tf
@@ -38,64 +38,71 @@ else:
 
 # --- Project imports ---
 from data_loader import get_generators
-from model import build_model  # <--- add this
-from sklearn.metrics import classification_report
+from model import build_model
+from sklearn.metrics import classification_report, roc_curve, confusion_matrix
 from plot_utils import save_confusion_matrix, save_roc_curve
 import numpy as np
+import matplotlib.pyplot as plt
 from tensorflow.keras.models import load_model
 
 # --- Config ---
 IMG_SIZE = 224
 BATCH_SIZE = 32
-MODEL_PATH = "models/efficientnetb0_isic16.h5"
+MODEL_PATH = "models/mobilenetv2_isic16.h5"
 
 if not os.path.isfile(MODEL_PATH):
     raise FileNotFoundError(f"[ERROR] Model not found at {MODEL_PATH}. Please verify training completion.")
 
 # --- Load model ---
-model = load_model("models/mobilenetv2_isic16.h5", custom_objects={"focal_loss_fixed": focal_loss(gamma=2.0, alpha=0.25)})
+model = load_model(MODEL_PATH, custom_objects={"focal_loss_fixed": focal_loss(gamma=2.0, alpha=0.75)})
 
 # --- Load data ---
-print("[INFO] Preparing test generator...")
-_, _, test_gen = get_generators(train_csv_name=TRAIN_CSV_NAME, img_size=IMG_SIZE, batch_size=BATCH_SIZE)
+print("[INFO] Preparing generators...")
+_, val_gen, test_gen = get_generators(train_csv_name=TRAIN_CSV_NAME, img_size=IMG_SIZE, batch_size=BATCH_SIZE)
 
-if hasattr(test_gen, 'shuffle') and test_gen.shuffle:
-    print("[WARNING] Test generator is shuffled — this may desynchronize labels and predictions.")
+# --- Threshold tuning on validation set ---
+y_val_prob = model.predict(val_gen).flatten()
+y_val_true = np.array(val_gen.classes)
+fpr, tpr, thresholds = roc_curve(y_val_true, y_val_prob)
+youden_index = tpr - fpr
+optimal_idx = np.argmax(youden_index)
+optimal_threshold = thresholds[optimal_idx]
 
-# --- Evaluation ---
-try:
-    print("[INFO] Evaluating model on test set...")
-    results = model.evaluate(test_gen)
-    for name, val in zip(model.metrics_names, results):
-        print(f"{name}: {val:.4f}")
-except Exception as e:
-    print(f"[ERROR] Evaluation failed: {e}")
+print(f"[INFO] Optimal threshold (from validation): {optimal_threshold:.4f}")
 
-# --- Predictions and metrics ---
-print("[INFO] Generating predictions...")
-y_prob = model.predict(test_gen)
-y_pred = np.array((y_prob > 0.5).astype(int).flatten())
+# --- Evaluate on test set using tuned threshold ---
+print("[INFO] Evaluating model on test set...")
+results = model.evaluate(test_gen)
+for name, val in zip(model.metrics_names, results):
+    print(f"{name}: {val:.4f}")
 
+print("[INFO] Generating test predictions...")
+y_prob = model.predict(test_gen).flatten()
+y_pred = (y_prob >= optimal_threshold).astype(int)
 y_true = np.array(test_gen.classes)
 labels = list(test_gen.class_indices.keys())
 
-y_true = np.array(y_true)
-print(f"[INFO] y_true shape: {y_true.shape}, y_pred shape: {y_pred.shape}")
+print("\n[INFO] Classification Report (test set, tuned threshold):")
+report = classification_report(y_true, y_pred, target_names=labels, digits=4)
+print(report)
 
-print("\n[INFO] Classification Report:")
-print(classification_report(y_true, y_pred, target_names=labels))
+# Save confusion matrix and ROC for test set
+save_confusion_matrix(y_true, y_pred, labels, os.path.join(output_dir, "confusion_matrix_tuned.png"))
 
-# --- Confusion matrix ---
-print("[INFO] Saving confusion matrix plot...")
-confusion_matrix_filename = "confusion_matrix.png"
-confusion_matrix_path = os.path.join(output_dir, confusion_matrix_filename)
-save_confusion_matrix(y_true, y_pred, labels, confusion_matrix_path)
+plt.figure()
+plt.plot(fpr, tpr, label=f"Validation AUC = {np.trapz(tpr, fpr):.4f}")
+plt.scatter(fpr[optimal_idx], tpr[optimal_idx], color='red', label=f"Optimal threshold = {optimal_threshold:.4f}")
+plt.plot([0, 1], [0, 1], 'k--')
+plt.xlabel("False Positive Rate")
+plt.ylabel("True Positive Rate")
+plt.title("ROC Curve (Validation-based Threshold)")
+plt.legend()
+plt.savefig(os.path.join(output_dir, "roc_curve_val_based.png"))
+plt.close()
 
-# --- ROC curve ---
-roc_filename = "roc_curve.png"
-roc_path = os.path.join(output_dir, roc_filename)
-print("[INFO] Saving ROC curve plot...")
-save_roc_curve(y_true, y_prob.flatten(), roc_path)
+with open(os.path.join(output_dir, "optimal_threshold.txt"), "w") as f:
+    f.write(f"Optimal threshold from validation: {optimal_threshold:.4f}\n\n")
+    f.write(report)
 
 print(f"[INFO] Evaluation completed at: {datetime.now().isoformat()}")
 log_file.close()

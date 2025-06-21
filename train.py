@@ -4,6 +4,8 @@ import pickle
 import numpy as np
 import tensorflow as tf
 from collections import Counter
+from sklearn.metrics import roc_curve
+import matplotlib.pyplot as plt
 
 # --- Environment Setup ---
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -179,3 +181,28 @@ plot_history(
     save_path=output_dir,
     metrics=["accuracy", "loss", "auc", "recall"]
 )
+
+# --- Compute and Save Validation Threshold ---
+y_val_prob = model.predict(val_gen).flatten()
+y_val_true = np.array(val_gen.classes)
+fpr, tpr, thresholds = roc_curve(y_val_true, y_val_prob)
+youden_index = tpr - fpr
+optimal_idx = np.argmax(youden_index)
+optimal_threshold = thresholds[optimal_idx]
+
+with open(os.path.join(output_dir, "optimal_threshold_val.txt"), "w") as f:
+    f.write(f"Optimal threshold from validation: {optimal_threshold:.4f}\n")
+
+print(f"[INFO] Saved optimal validation threshold: {optimal_threshold:.4f}")
+
+
+# --- Plot Training Curves ---
+plot_history(
+    histories={
+        "Head": history_head,
+        "Fine": history_fine
+    },
+    save_path=output_dir,
+    metrics=["accuracy", "loss", "auc", "recall"]
+)
+
