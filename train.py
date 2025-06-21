@@ -40,7 +40,7 @@ else:
 
 # --- Project Imports ---
 from model import build_model
-from data_loader import get_generators
+from data_loader import get_generators, load_dataframes
 from plot_utils import plot_history
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
@@ -57,6 +57,15 @@ MODEL_PATH = "models/mobilenetv2_isic16.h5"
 
 # --- Dataset Configuration ---
 TRAIN_CSV_NAME = "Augmented_Training_labels.csv"  # or "Training_labels.csv"
+
+# --- Class Distribution Output ---
+def print_distribution(name, df):
+    counts = df['label'].astype(int).value_counts().sort_index()
+    print(f"[{name}] Class 0: {counts.get(0, 0)} | Class 1: {counts.get(1, 0)}")
+
+train_df, val_df, _ = load_dataframes(TRAIN_CSV_NAME)
+print_distribution("Train", train_df)
+print_distribution("Validation", val_df)
 
 # --- Save Training History ---
 def save_history(history, filename):
@@ -123,7 +132,6 @@ save_history(history_head, "models/history_mobilenetv2_head.pkl")
 # --- Fine-tune Deeper Layers of Base Model ---
 print("Fine-tuning base model (partial unfreezing)...")
 
-# Unfreeze last N layers of the base model
 UNFREEZE_FROM_LAYER = 100  # MobileNetV2 has 155 layers
 total_layers = len(base_model.layers)
 print(f"Total layers in base model: {total_layers}")
@@ -135,7 +143,6 @@ for layer in base_model.layers[UNFREEZE_FROM_LAYER:]:
 
 print(f"Unfroze layers from {UNFREEZE_FROM_LAYER} to {total_layers}")
 
-# Recompile with lower learning rate
 model.compile(
     optimizer=Adam(learning_rate=LR_FINE),
     loss=focal_loss(gamma=1.5, alpha=0.5),
