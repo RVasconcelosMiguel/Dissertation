@@ -15,7 +15,7 @@ assert "rmiguel_datasets" in augmented_folder, "Unsafe output path! Aborting."
 
 # === Create Output Directory ===
 if os.path.exists(augmented_folder):
-    print(f"⚠️ Folder {augmented_folder} already exists. It will be deleted.")
+    print(f"Folder {augmented_folder} already exists. It will be deleted.")
     shutil.rmtree(augmented_folder)
 os.makedirs(augmented_folder, exist_ok=True)
 
