@@ -55,6 +55,9 @@ LR_HEAD = 1e-4
 LR_FINE = 1e-6
 MODEL_PATH = "models/mobilenetv2_isic16.h5"
 
+# --- Dataset Configuration ---
+TRAIN_CSV_NAME = "Augmented_Training_labels.csv"  # or "Training_labels.csv"
+
 # --- Save Training History ---
 def save_history(history, filename):
     try:
@@ -88,7 +91,11 @@ def focal_loss(gamma=1.5, alpha=0.5):
     return focal_loss_fixed
 
 # --- Load Data ---
-train_gen, val_gen, test_gen = get_generators(img_size=IMG_SIZE, batch_size=BATCH_SIZE)
+train_gen, val_gen, test_gen = get_generators(
+    train_csv_name=TRAIN_CSV_NAME,
+    img_size=IMG_SIZE,
+    batch_size=BATCH_SIZE
+)
 class_weights = compute_class_weights(train_gen)
 
 # --- Build and Compile Classification Head ---
@@ -116,7 +123,7 @@ save_history(history_head, "models/history_mobilenetv2_head.pkl")
 # --- Fine-tune Deeper Layers of Base Model ---
 print("Fine-tuning base model (partial unfreezing)...")
 
-# Unfreeze last 50 layers of the base model
+# Unfreeze last N layers of the base model
 UNFREEZE_FROM_LAYER = 100  # MobileNetV2 has 155 layers
 total_layers = len(base_model.layers)
 print(f"Total layers in base model: {total_layers}")
@@ -128,7 +135,7 @@ for layer in base_model.layers[UNFREEZE_FROM_LAYER:]:
 
 print(f"Unfroze layers from {UNFREEZE_FROM_LAYER} to {total_layers}")
 
-# Recompile with low learning rate
+# Recompile with lower learning rate
 model.compile(
     optimizer=Adam(learning_rate=LR_FINE),
     loss=focal_loss(gamma=1.5, alpha=0.5),
