@@ -1,4 +1,3 @@
-# === train.py ===
 import os
 import sys
 import pickle
@@ -7,7 +6,13 @@ import tensorflow as tf
 from collections import Counter
 from sklearn.metrics import roc_curve
 import matplotlib.pyplot as plt
-from tensorflow.keras.regularizers import l2
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
+from tensorflow.keras import backend as K
+from model import build_model
+from data_loader import get_generators, load_dataframes
+from plot_utils import plot_history
+from losses import FocalLoss  # Make sure this file exists and is correctly implemented
 
 # === ENVIRONMENT SETUP ===
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -34,33 +39,6 @@ if gpus:
         print("Error enabling memory growth:", e)
 else:
     print("No GPU found — using CPU.")
-
-# === IMPORTS ===
-from data_loader import get_generators, load_dataframes
-from plot_utils import plot_history
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
-from tensorflow.keras import backend as K
-from model import build_model
-
-# === CUSTOM FOCAL LOSS ===
-@tf.keras.utils.register_keras_serializable()
-class FocalLoss(tf.keras.losses.Loss):
-    def __init__(self, gamma=2.0, alpha=0.75, **kwargs):
-        super().__init__(**kwargs)
-        self.gamma = gamma
-        self.alpha = alpha
-
-    def call(self, y_true, y_pred):
-        epsilon = K.epsilon()
-        y_pred = K.clip(y_pred, epsilon, 1. - epsilon)
-        pt_1 = tf.where(K.equal(y_true, 1), y_pred, K.ones_like(y_pred))
-        pt_0 = tf.where(K.equal(y_true, 0), y_pred, K.zeros_like(y_pred))
-        return -K.mean(self.alpha * K.pow(1. - pt_1, self.gamma) * K.log(pt_1)) \
-               -K.mean((1 - self.alpha) * K.pow(pt_0, self.gamma) * K.log(1. - pt_0))
-
-    def get_config(self):
-        return {"gamma": self.gamma, "alpha": self.alpha}
 
 # === HELPER FUNCTIONS ===
 def print_distribution(name, df):
@@ -106,8 +84,7 @@ model, base_model = build_model(img_size=IMG_SIZE)
 model.summary()
 
 # === PHASE 1: HEAD TRAINING ===
-loss_fn = FocalLoss(gamma=2.0, alpha=0.75)
-model.compile(optimizer=Adam(learning_rate=LR_HEAD), loss=loss_fn, metrics=["accuracy"])
+model.compile(optimizer=Adam(learning_rate=LR_HEAD), loss=FocalLoss(gamma=2.0, alpha=0.75), metrics=["accuracy"])
 print("Training classification head...")
 history_head = model.fit(train_gen, validation_data=val_gen, epochs=EPOCHS_HEAD)
 model.save("models/efficientnetb1_head_trained.keras")
@@ -123,7 +100,7 @@ for layer in base_model.layers[UNFREEZE_FROM_LAYER:]:
 
 model.compile(
     optimizer=Adam(learning_rate=LR_FINE),
-    loss=loss_fn,
+    loss=FocalLoss(gamma=2.0, alpha=0.75),
     metrics=["accuracy", tf.keras.metrics.AUC(name="auc"), tf.keras.metrics.Precision(name="precision"), tf.keras.metrics.Recall(name="recall")]
 )
 
