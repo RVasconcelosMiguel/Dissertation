@@ -6,6 +6,7 @@ import tensorflow as tf
 from collections import Counter
 from sklearn.metrics import roc_curve
 import matplotlib.pyplot as plt
+from tensorflow.keras.regularizers import l2
 
 # --- Environment Setup ---
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -41,35 +42,28 @@ else:
     print("No GPU found — using CPU.")
 
 # --- Project Imports ---
-from model import build_model
 from data_loader import get_generators, load_dataframes
 from plot_utils import plot_history
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
 from tensorflow.keras import backend as K
+from tensorflow.keras.applications import MobileNetV2
+from tensorflow.keras.layers import GlobalAveragePooling2D, Dropout, Dense
+from tensorflow.keras.models import Model
+
+# --- Build Model with Regularization ---
+def build_model(img_size=224, dropout=0.5, l2_lambda=1e-4):
+    base_model = MobileNetV2(include_top=False, weights="imagenet", input_shape=(img_size, img_size, 3))
+    base_model.trainable = False
+    x = GlobalAveragePooling2D()(base_model.output)
+    x = Dropout(dropout)(x)
+    output = Dense(1, activation="sigmoid", kernel_regularizer=l2(l2_lambda))(x)
+    return Model(base_model.input, output), base_model
 
 # --- Print class distributions (for logging only) ---
 def print_distribution(name, df):
     counts = df['label'].astype(int).value_counts().sort_index()
     print(f"[{name}] Class 0: {counts.get(0, 0)} | Class 1: {counts.get(1, 0)}")
-
-
-# --- Updated Training Configuration ---
-IMG_SIZE = 224
-BATCH_SIZE = 32
-EPOCHS_HEAD = 50
-EPOCHS_FINE = 50
-LR_HEAD = 1e-4
-LR_FINE = 3e-5
-MODEL_PATH = "models/mobilenetv2_isic16.h5"
-
-# --- Dataset Configuration ---
-TRAIN_CSV_NAME = "Augmented_Training_labels.csv"
-
-# --- Print class distributions (for logging only) ---
-train_df, val_df, _ = load_dataframes(TRAIN_CSV_NAME)
-print_distribution("Train", train_df)
-print_distribution("Validation", val_df)
 
 # --- Save Training History ---
 def save_history(history, filename):
@@ -79,6 +73,18 @@ def save_history(history, filename):
         print(f"[DEBUG] History saved to {filename}")
     except Exception as e:
         print(f"[ERROR] Could not save history using pickle: {e}")
+
+# --- Compute Class Weights ---
+def compute_class_weights(generator):
+    labels = generator.classes
+    counts = Counter(labels)
+    total = sum(counts.values())
+    class_weights = {
+        0: total / (2.0 * counts[0]),
+        1: total / (2.0 * counts[1])
+    }
+    print(f"[INFO] Computed class weights: {class_weights}")
+    return class_weights
 
 # --- Define Focal Loss ---
 def focal_loss(gamma=2.0, alpha=0.75):
@@ -91,40 +97,40 @@ def focal_loss(gamma=2.0, alpha=0.75):
                -K.mean((1 - alpha) * K.pow(pt_0, gamma) * K.log(1. - pt_0))
     return focal_loss_fixed
 
-# --- Load Data ---
-train_gen, val_gen, test_gen = get_generators(
-    train_csv_name=TRAIN_CSV_NAME,
-    img_size=IMG_SIZE,
-    batch_size=BATCH_SIZE
-)
+# --- Configurations ---
+IMG_SIZE = 224
+BATCH_SIZE = 32
+EPOCHS_HEAD = 50
+EPOCHS_FINE = 50
+LR_HEAD = 1e-4
+LR_FINE = 3e-5
+MODEL_PATH = "models/mobilenetv2_isic16.h5"
+TRAIN_CSV_NAME = "Augmented_Training_labels.csv"
 
-# --- Build and Compile Classification Head ---
+# --- Load Data and Print Distribution ---
+train_df, val_df, _ = load_dataframes(TRAIN_CSV_NAME)
+print_distribution("Train", train_df)
+print_distribution("Validation", val_df)
+train_gen, val_gen, test_gen = get_generators(TRAIN_CSV_NAME, IMG_SIZE, BATCH_SIZE)
+
+# --- Compute Class Weights ---
+class_weights = compute_class_weights(train_gen)
+
+# --- Build Model ---
 model, base_model = build_model(img_size=IMG_SIZE)
 model.summary()
 
-model.compile(
-    optimizer=Adam(learning_rate=LR_HEAD),
-    loss=focal_loss(gamma=2.0, alpha=0.75),
-    metrics=["accuracy"]
-)
-
+# --- Train Head ---
+model.compile(optimizer=Adam(learning_rate=LR_HEAD), loss=focal_loss(), metrics=["accuracy"])
 print("Training classification head...")
-history_head = model.fit(
-    train_gen,
-    validation_data=val_gen,
-    epochs=EPOCHS_HEAD
-)
-
+history_head = model.fit(train_gen, validation_data=val_gen, epochs=EPOCHS_HEAD)
 model.save("models/mobilenetv2_head_trained.h5")
 save_history(history_head, "models/history_mobilenetv2_head.pkl")
 
-# --- Fine-tune Base Model ---
+# --- Fine-tuning ---
 print("Fine-tuning base model (partial unfreezing)...")
-UNFREEZE_FROM_LAYER = 50  # changed from 75 → unfreeze earlier
+UNFREEZE_FROM_LAYER = 50
 total_layers = len(base_model.layers)
-print(f"Total layers in base model: {total_layers}")
-print(f"Unfreezing from layer {UNFREEZE_FROM_LAYER}...")
-
 for layer in base_model.layers[:UNFREEZE_FROM_LAYER]:
     layer.trainable = False
 for layer in base_model.layers[UNFREEZE_FROM_LAYER:]:
@@ -132,7 +138,7 @@ for layer in base_model.layers[UNFREEZE_FROM_LAYER:]:
 
 model.compile(
     optimizer=Adam(learning_rate=LR_FINE),
-    loss=focal_loss(gamma=2.0, alpha=0.75),
+    loss=focal_loss(),
     metrics=[
         "accuracy",
         tf.keras.metrics.AUC(name="auc"),
@@ -151,17 +157,14 @@ history_fine = model.fit(
     train_gen,
     validation_data=val_gen,
     epochs=EPOCHS_FINE,
-    callbacks=callbacks_fine
+    callbacks=callbacks_fine,
+    class_weight=class_weights
 )
-
 save_history(history_fine, "models/history_mobilenetv2_fine.pkl")
 
 # --- Plot Training Curves ---
 plot_history(
-    histories={
-        "Head": history_head,
-        "Fine": history_fine
-    },
+    histories={"Head": history_head, "Fine": history_fine},
     save_path=output_dir,
     metrics=["accuracy", "loss", "auc", "recall"]
 )
@@ -178,14 +181,3 @@ with open(os.path.join(output_dir, "optimal_threshold_val.txt"), "w") as f:
     f.write(f"Optimal threshold from validation: {optimal_threshold:.4f}\n")
 
 print(f"[INFO] Saved optimal validation threshold: {optimal_threshold:.4f}")
-
-# --- Plot Training Curves ---
-plot_history(
-    histories={
-        "Head": history_head,
-        "Fine": history_fine
-    },
-    save_path=output_dir,
-    metrics=["accuracy", "loss", "auc", "recall"]
-)
-
