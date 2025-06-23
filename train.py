@@ -6,12 +6,15 @@ import tensorflow as tf
 from collections import Counter
 from sklearn.metrics import roc_curve
 import matplotlib.pyplot as plt
+
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
+from tensorflow.keras import backend as K
+
 from model import build_model
 from data_loader import get_generators, load_dataframes
 from plot_utils import plot_history
-from losses import FocalLoss  # Ensure this is correctly implemented
+from losses import FocalLoss  # Custom loss with serialization support
 
 # === ENVIRONMENT SETUP ===
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -68,7 +71,7 @@ EPOCHS_HEAD = 50
 EPOCHS_FINE = 50
 LR_HEAD = 1e-4
 LR_FINE = 3e-5
-MODEL_PATH = "models/efficientnetb1_isic16"  # SavedModel format
+MODEL_PATH = "models/efficientnetb1_isic16"  # no extension
 TRAIN_CSV_NAME = "Augmented_Training_labels.csv"
 
 # === DATA LOADING ===
@@ -83,7 +86,12 @@ model, base_model = build_model(img_size=IMG_SIZE)
 model.summary()
 
 # === PHASE 1: HEAD TRAINING ===
-model.compile(optimizer=Adam(learning_rate=LR_HEAD), loss=FocalLoss(gamma=2.0, alpha=0.75), metrics=["accuracy"])
+model.compile(
+    optimizer=Adam(learning_rate=LR_HEAD),
+    loss=FocalLoss(gamma=2.0, alpha=0.75),
+    metrics=["accuracy"]
+)
+
 print("Training classification head...")
 history_head = model.fit(train_gen, validation_data=val_gen, epochs=EPOCHS_HEAD)
 model.save("models/efficientnetb1_head_trained")  # SavedModel format
@@ -100,7 +108,12 @@ for layer in base_model.layers[UNFREEZE_FROM_LAYER:]:
 model.compile(
     optimizer=Adam(learning_rate=LR_FINE),
     loss=FocalLoss(gamma=2.0, alpha=0.75),
-    metrics=["accuracy", tf.keras.metrics.AUC(name="auc"), tf.keras.metrics.Precision(name="precision"), tf.keras.metrics.Recall(name="recall")]
+    metrics=[
+        "accuracy",
+        tf.keras.metrics.AUC(name="auc"),
+        tf.keras.metrics.Precision(name="precision"),
+        tf.keras.metrics.Recall(name="recall")
+    ]
 )
 
 callbacks_fine = [
