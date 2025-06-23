@@ -48,6 +48,12 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
 from tensorflow.keras import backend as K
 
+# --- Print class distributions (for logging only) ---
+def print_distribution(name, df):
+    counts = df['label'].astype(int).value_counts().sort_index()
+    print(f"[{name}] Class 0: {counts.get(0, 0)} | Class 1: {counts.get(1, 0)}")
+
+
 # --- Updated Training Configuration ---
 IMG_SIZE = 224
 BATCH_SIZE = 32
