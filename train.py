@@ -66,13 +66,18 @@ def compute_class_weights(generator):
     }
 
 def focal_loss(gamma=2.0, alpha=0.75):
+    gamma = float(gamma)
+    alpha = float(alpha)
+
     def focal_loss_fixed(y_true, y_pred):
         epsilon = K.epsilon()
         y_pred = K.clip(y_pred, epsilon, 1. - epsilon)
-        pt_1 = tf.where(K.equal(y_true, 1), y_pred, K.ones_like(y_pred))
-        pt_0 = tf.where(K.equal(y_true, 0), y_pred, K.zeros_like(y_pred))
+        pt_1 = tf.where(K.equal(y_true, 1), y_pred, tf.ones_like(y_pred))
+        pt_0 = tf.where(K.equal(y_true, 0), y_pred, tf.zeros_like(y_pred))
         return -K.mean(alpha * K.pow(1. - pt_1, gamma) * K.log(pt_1)) \
                -K.mean((1 - alpha) * K.pow(pt_0, gamma) * K.log(1. - pt_0))
+
+    focal_loss_fixed.__name__ = "focal_loss_fixed"
     return focal_loss_fixed
 
 # === CONFIGURATION ===
@@ -82,7 +87,7 @@ EPOCHS_HEAD = 50
 EPOCHS_FINE = 50
 LR_HEAD = 1e-4
 LR_FINE = 3e-5
-MODEL_PATH = "models/efficientnetb1_isic16.h5"
+MODEL_PATH = "models/efficientnetb1_isic16.keras"
 TRAIN_CSV_NAME = "Augmented_Training_labels.csv"
 
 # === DATA LOADING ===
@@ -100,7 +105,7 @@ model.summary()
 model.compile(optimizer=Adam(learning_rate=LR_HEAD), loss=focal_loss(), metrics=["accuracy"])
 print("Training classification head...")
 history_head = model.fit(train_gen, validation_data=val_gen, epochs=EPOCHS_HEAD)
-model.save("models/efficientnetb1_head_trained.h5")  # Safe save format
+model.save("models/efficientnetb1_head_trained.keras", include_optimizer=False)
 save_history(history_head, "models/history_efficientnetb1_head.pkl")
 
 # === PHASE 2: FINE-TUNING ===
