@@ -78,7 +78,7 @@ EPOCHS_HEAD = 50
 EPOCHS_FINE = 50
 LR_HEAD = 1e-4
 LR_FINE = 3e-5
-MODEL_PATH = "models/efficientnetb1_isic16.h5"
+MODEL_PATH = "models/efficientnetb1_isic16.keras"
 TRAIN_CSV_NAME = "Augmented_Training_labels.csv"
 
 train_df, val_df, _ = load_dataframes(TRAIN_CSV_NAME)
@@ -93,7 +93,7 @@ model.summary()
 model.compile(optimizer=Adam(learning_rate=LR_HEAD), loss=focal_loss(), metrics=["accuracy"])
 print("Training classification head...")
 history_head = model.fit(train_gen, validation_data=val_gen, epochs=EPOCHS_HEAD)
-model.save("models/efficientnetb1_head_trained.h5")
+model.save("models/efficientnetb1_head_trained.keras", save_format="keras")
 save_history(history_head, "models/history_efficientnetb1_head.pkl")
 
 print("Fine-tuning base model...")

@@ -25,7 +25,8 @@ from train import focal_loss
 
 IMG_SIZE = 224
 BATCH_SIZE = 32
-MODEL_PATH = "models/efficientnetb1_isic16.h5"
+MODEL_PATH = "models/efficientnetb1_isic16.keras"
+print(f"[INFO] Loaded model from: {MODEL_PATH}")
 if not os.path.isfile(MODEL_PATH):
     raise FileNotFoundError("Model not found.")
 
