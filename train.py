@@ -48,7 +48,7 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
 from tensorflow.keras import backend as K
 
-# --- Training Configuration ---
+# --- Updated Training Configuration ---
 IMG_SIZE = 224
 BATCH_SIZE = 32
 EPOCHS_HEAD = 50
@@ -60,11 +60,7 @@ MODEL_PATH = "models/mobilenetv2_isic16.h5"
 # --- Dataset Configuration ---
 TRAIN_CSV_NAME = "Augmented_Training_labels.csv"
 
-# --- Class Distribution Output ---
-def print_distribution(name, df):
-    counts = df['label'].astype(int).value_counts().sort_index()
-    print(f"[{name}] Class 0: {counts.get(0, 0)} | Class 1: {counts.get(1, 0)}")
-
+# --- Print class distributions (for logging only) ---
 train_df, val_df, _ = load_dataframes(TRAIN_CSV_NAME)
 print_distribution("Train", train_df)
 print_distribution("Validation", val_df)
@@ -77,18 +73,6 @@ def save_history(history, filename):
         print(f"[DEBUG] History saved to {filename}")
     except Exception as e:
         print(f"[ERROR] Could not save history using pickle: {e}")
-
-# --- Compute Class Weights ---
-def compute_class_weights(generator):
-    labels = generator.classes
-    counts = Counter(labels)
-    total = sum(counts.values())
-    class_weights = {
-        0: total / (2.0 * counts[0]),
-        1: total / (2.0 * counts[1])
-    }
-    print(f"[INFO] Computed class weights: {class_weights}")
-    return class_weights
 
 # --- Define Focal Loss ---
 def focal_loss(gamma=2.0, alpha=0.75):
@@ -107,7 +91,6 @@ train_gen, val_gen, test_gen = get_generators(
     img_size=IMG_SIZE,
     batch_size=BATCH_SIZE
 )
-class_weights = compute_class_weights(train_gen)
 
 # --- Build and Compile Classification Head ---
 model, base_model = build_model(img_size=IMG_SIZE)
@@ -123,27 +106,23 @@ print("Training classification head...")
 history_head = model.fit(
     train_gen,
     validation_data=val_gen,
-    epochs=EPOCHS_HEAD,
-    class_weight=class_weights
+    epochs=EPOCHS_HEAD
 )
 
 model.save("models/mobilenetv2_head_trained.h5")
-print("Saved model after head training.")
 save_history(history_head, "models/history_mobilenetv2_head.pkl")
 
 # --- Fine-tune Base Model ---
 print("Fine-tuning base model (partial unfreezing)...")
-
-UNFREEZE_FROM_LAYER = 75
+UNFREEZE_FROM_LAYER = 50  # changed from 75 → unfreeze earlier
 total_layers = len(base_model.layers)
 print(f"Total layers in base model: {total_layers}")
+print(f"Unfreezing from layer {UNFREEZE_FROM_LAYER}...")
 
 for layer in base_model.layers[:UNFREEZE_FROM_LAYER]:
     layer.trainable = False
 for layer in base_model.layers[UNFREEZE_FROM_LAYER:]:
     layer.trainable = True
-
-print(f"Unfroze layers from {UNFREEZE_FROM_LAYER} to {total_layers}")
 
 model.compile(
     optimizer=Adam(learning_rate=LR_FINE),
@@ -166,8 +145,7 @@ history_fine = model.fit(
     train_gen,
     validation_data=val_gen,
     epochs=EPOCHS_FINE,
-    callbacks=callbacks_fine,
-    class_weight=class_weights
+    callbacks=callbacks_fine
 )
 
 save_history(history_fine, "models/history_mobilenetv2_fine.pkl")
@@ -194,7 +172,6 @@ with open(os.path.join(output_dir, "optimal_threshold_val.txt"), "w") as f:
     f.write(f"Optimal threshold from validation: {optimal_threshold:.4f}\n")
 
 print(f"[INFO] Saved optimal validation threshold: {optimal_threshold:.4f}")
-
 
 # --- Plot Training Curves ---
 plot_history(
