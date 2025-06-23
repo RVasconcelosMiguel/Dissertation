@@ -8,11 +8,10 @@ from sklearn.metrics import roc_curve
 import matplotlib.pyplot as plt
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
-from tensorflow.keras import backend as K
 from model import build_model
 from data_loader import get_generators, load_dataframes
 from plot_utils import plot_history
-from losses import FocalLoss  # Make sure this file exists and is correctly implemented
+from losses import FocalLoss  # Ensure this is implemented correctly
 
 # === ENVIRONMENT SETUP ===
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -69,7 +68,7 @@ EPOCHS_HEAD = 50
 EPOCHS_FINE = 50
 LR_HEAD = 1e-4
 LR_FINE = 3e-5
-MODEL_PATH = "models/efficientnetb1_isic16.keras"
+MODEL_PATH = "models/efficientnetb1_isic16"
 TRAIN_CSV_NAME = "Augmented_Training_labels.csv"
 
 # === DATA LOADING ===
@@ -87,8 +86,8 @@ model.summary()
 model.compile(optimizer=Adam(learning_rate=LR_HEAD), loss=FocalLoss(gamma=2.0, alpha=0.75), metrics=["accuracy"])
 print("Training classification head...")
 history_head = model.fit(train_gen, validation_data=val_gen, epochs=EPOCHS_HEAD)
-model.save("models/efficientnetb1_head_trained.keras")
-save_history(history_head, "models/history_efficientnetb1_head.pkl")
+model.save(os.path.join(MODEL_PATH + "_head"))  # SavedModel format
+save_history(history_head, os.path.join("models", "history_efficientnetb1_head.pkl"))
 
 # === PHASE 2: FINE-TUNING ===
 print("Fine-tuning base model...")
@@ -117,7 +116,7 @@ history_fine = model.fit(
     callbacks=callbacks_fine,
     class_weight=class_weights
 )
-save_history(history_fine, "models/history_efficientnetb1_fine.pkl")
+save_history(history_fine, os.path.join("models", "history_efficientnetb1_fine.pkl"))
 
 # === PLOTTING & THRESHOLDING ===
 plot_history({"Head": history_head, "Fine": history_fine}, output_dir, ["accuracy", "loss", "auc", "recall"])
