@@ -9,6 +9,7 @@ from sklearn.metrics import roc_curve
 import matplotlib.pyplot as plt
 from tensorflow.keras.regularizers import l2
 
+# === ENVIRONMENT SETUP ===
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 output_dir = "/home/jtstudents/rmiguel/files_to_transfer"
@@ -34,6 +35,7 @@ if gpus:
 else:
     print("No GPU found — using CPU.")
 
+# === IMPORTS ===
 from data_loader import get_generators, load_dataframes
 from plot_utils import plot_history
 from tensorflow.keras.optimizers import Adam
@@ -41,6 +43,7 @@ from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLRO
 from tensorflow.keras import backend as K
 from model import build_model
 
+# === HELPER FUNCTIONS ===
 def print_distribution(name, df):
     counts = df['label'].astype(int).value_counts().sort_index()
     print(f"[{name}] Class 0: {counts.get(0, 0)} | Class 1: {counts.get(1, 0)}")
@@ -72,30 +75,35 @@ def focal_loss(gamma=2.0, alpha=0.75):
                -K.mean((1 - alpha) * K.pow(pt_0, gamma) * K.log(1. - pt_0))
     return focal_loss_fixed
 
+# === CONFIGURATION ===
 IMG_SIZE = 224
 BATCH_SIZE = 32
 EPOCHS_HEAD = 50
 EPOCHS_FINE = 50
 LR_HEAD = 1e-4
 LR_FINE = 3e-5
-MODEL_PATH = "models/efficientnetb1_isic16.keras"
+MODEL_PATH = "models/efficientnetb1_isic16.h5"
 TRAIN_CSV_NAME = "Augmented_Training_labels.csv"
 
+# === DATA LOADING ===
 train_df, val_df, _ = load_dataframes(TRAIN_CSV_NAME)
 print_distribution("Train", train_df)
 print_distribution("Validation", val_df)
 train_gen, val_gen, test_gen = get_generators(TRAIN_CSV_NAME, IMG_SIZE, BATCH_SIZE)
 class_weights = compute_class_weights(train_gen)
 
+# === MODEL CONSTRUCTION ===
 model, base_model = build_model(img_size=IMG_SIZE)
 model.summary()
 
+# === PHASE 1: HEAD TRAINING ===
 model.compile(optimizer=Adam(learning_rate=LR_HEAD), loss=focal_loss(), metrics=["accuracy"])
 print("Training classification head...")
 history_head = model.fit(train_gen, validation_data=val_gen, epochs=EPOCHS_HEAD)
-model.save("models/efficientnetb1_head_trained.keras", save_format="keras")
+model.save("models/efficientnetb1_head_trained.h5")  # Safe save format
 save_history(history_head, "models/history_efficientnetb1_head.pkl")
 
+# === PHASE 2: FINE-TUNING ===
 print("Fine-tuning base model...")
 UNFREEZE_FROM_LAYER = 300
 for layer in base_model.layers[:UNFREEZE_FROM_LAYER]:
@@ -115,9 +123,16 @@ callbacks_fine = [
     ReduceLROnPlateau(monitor="val_recall", mode="max", factor=0.5, patience=7, min_lr=1e-7, verbose=1)
 ]
 
-history_fine = model.fit(train_gen, validation_data=val_gen, epochs=EPOCHS_FINE, callbacks=callbacks_fine, class_weight=class_weights)
+history_fine = model.fit(
+    train_gen,
+    validation_data=val_gen,
+    epochs=EPOCHS_FINE,
+    callbacks=callbacks_fine,
+    class_weight=class_weights
+)
 save_history(history_fine, "models/history_efficientnetb1_fine.pkl")
 
+# === PLOTTING & THRESHOLDING ===
 plot_history({"Head": history_head, "Fine": history_fine}, output_dir, ["accuracy", "loss", "auc", "recall"])
 
 y_val_prob = model.predict(val_gen).flatten()
