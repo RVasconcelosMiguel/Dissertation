@@ -76,9 +76,10 @@ EPOCHS_HEAD = 50
 EPOCHS_FINE = 50
 LR_HEAD = 1e-4
 LR_FINE = 3e-5
-UNFREEZE_FROM_LAYER = 200  # <-- less conservative than before
+UNFREEZE_FROM_LAYER = 200
 MODEL_PATH = "models/efficientnetb1_finetuned_weights"
 TRAIN_CSV_NAME = "Augmented_Training_labels.csv"
+THRESHOLD = 0.52
 
 # === DATA LOADING ===
 train_df, val_df, _ = load_dataframes(TRAIN_CSV_NAME)
@@ -91,16 +92,23 @@ class_weights = compute_class_weights(train_gen)
 model, base_model = build_model(img_size=IMG_SIZE)
 model.summary()
 
+# === METRICS WITH CUSTOM THRESHOLD ===
+metrics = [
+    tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
+    tf.keras.metrics.AUC(name="auc"),
+    tf.keras.metrics.Precision(name="precision", thresholds=THRESHOLD),
+    tf.keras.metrics.Recall(name="recall", thresholds=THRESHOLD),
+]
+
 # === PHASE 1: HEAD TRAINING ===
 model.compile(
     optimizer=Adam(learning_rate=LR_HEAD),
-    loss="binary_crossentropy",  # <-- changed from FocalLoss
-    metrics=["accuracy"]
+    loss=FocalLoss(gamma=1.0, alpha=0.25),
+    metrics=metrics
 )
 
 print("Training classification head...")
 history_head = model.fit(train_gen, validation_data=val_gen, epochs=EPOCHS_HEAD)
-
 model.save_weights("models/efficientnetb1_head_trained_weights")
 save_history(history_head, "models/history_efficientnetb1_head.pkl")
 
@@ -113,19 +121,14 @@ for layer in base_model.layers[UNFREEZE_FROM_LAYER:]:
 
 model.compile(
     optimizer=Adam(learning_rate=LR_FINE),
-    loss=FocalLoss(gamma=1.0, alpha=0.25),  # <-- softer focal loss
-    metrics=[
-        "accuracy",
-        tf.keras.metrics.AUC(name="auc"),
-        tf.keras.metrics.Precision(name="precision"),
-        tf.keras.metrics.Recall(name="recall")
-    ]
+    loss=FocalLoss(gamma=1.0, alpha=0.25),
+    metrics=metrics
 )
 
 callbacks_fine = [
-    EarlyStopping(monitor="val_recall", mode="max", patience=15, restore_best_weights=True),
-    ModelCheckpoint(MODEL_PATH, monitor="val_recall", mode="max", save_best_only=True, save_weights_only=True),
-    ReduceLROnPlateau(monitor="val_recall", mode="max", factor=0.5, patience=7, min_lr=1e-7, verbose=1),
+    EarlyStopping(monitor="val_auc", mode="max", patience=15, restore_best_weights=True),
+    ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
+    ReduceLROnPlateau(monitor="val_auc", mode="max", factor=0.5, patience=7, min_lr=1e-7, verbose=1),
     RecallLogger()
 ]
 
