@@ -32,7 +32,7 @@ def load_dataframes(train_csv_name):
     return df_train_train, df_train_val, df_test
 
 
-def get_generators(train_csv_name, img_size=224, batch_size=32):
+def get_generators(train_csv_name, img_size=224, batch_size=64):
 
     train_df, val_df, test_df = load_dataframes(train_csv_name)
 

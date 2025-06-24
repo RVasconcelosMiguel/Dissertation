@@ -6,17 +6,15 @@ import warnings
 from datetime import datetime
 
 # === Silence TensorFlow logging and warnings ===
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # 0 = all logs, 3 = errors only
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-tf_logger = logging.getLogger('tensorflow')
-tf_logger.setLevel(logging.ERROR)
+logging.getLogger('tensorflow').setLevel(logging.ERROR)
 warnings.filterwarnings("ignore", category=FutureWarning)
 
-# === Set output directory and log file ===
+# === Output Setup ===
 output_dir = "/home/jtstudents/rmiguel/files_to_transfer"
 os.makedirs(output_dir, exist_ok=True)
 log_file_path = os.path.join(output_dir, "evaluate_log.txt")
-
 log_file = open(log_file_path, "w")
 sys.stdout = log_file
 sys.stderr = log_file
@@ -32,7 +30,7 @@ from sklearn.metrics import classification_report, roc_curve
 from model import build_model
 from data_loader import get_generators
 from plot_utils import save_confusion_matrix
-from losses import FocalLoss  # ✅ Needed now that we use compile()
+from losses import FocalLoss
 
 # === CONFIGURATION ===
 IMG_SIZE = 224
@@ -40,33 +38,28 @@ BATCH_SIZE = 32
 WEIGHTS_PATH = "models/efficientnetb1_finetuned_weights"
 TRAIN_CSV_NAME = "Augmented_Training_labels.csv"
 
-# === Load Data ===
+# === Data Load ===
 _, val_gen, test_gen = get_generators(TRAIN_CSV_NAME, IMG_SIZE, BATCH_SIZE)
 
-# === Build & Load Model ===
+# === Build Model ===
 print("[INFO] Building model architecture...")
 model, _ = build_model(img_size=IMG_SIZE)
 
-print(f"[INFO] Loading weights from: {WEIGHTS_PATH}")
-if not os.path.isfile(WEIGHTS_PATH + ".index"):
-    raise FileNotFoundError("Weights not found. Expected .index and .data* files.")
+# === Predict Validation for Threshold Tuning ===
+print("[INFO] Loading weights from:", WEIGHTS_PATH)
+if not os.path.exists(WEIGHTS_PATH + ".index"):
+    raise FileNotFoundError(f"Missing weights: {WEIGHTS_PATH}.index")
 
 model.load_weights(WEIGHTS_PATH)
 
-# === Compile the model after loading weights ===
+# === Temporary Compilation (for threshold selection) ===
 model.compile(
-    optimizer=tf.keras.optimizers.Adam(learning_rate=3e-5),
-    loss=FocalLoss(gamma=2.0, alpha=0.75),
-    metrics=[
-        "accuracy",
-        tf.keras.metrics.AUC(name="auc"),
-        tf.keras.metrics.Precision(name="precision"),
-        tf.keras.metrics.Recall(name="recall")
-    ]
+    optimizer="adam",
+    loss=FocalLoss(gamma=1.0, alpha=0.25),
+    metrics=["accuracy"]
 )
 
-# === Validation Threshold ===
-print("[INFO] Predicting validation set...")
+print("[INFO] Predicting validation probabilities...")
 y_val_prob = model.predict(val_gen).flatten()
 y_val_true = np.array(val_gen.classes)
 fpr, tpr, thresholds = roc_curve(y_val_true, y_val_prob)
@@ -75,12 +68,28 @@ optimal_idx = np.argmax(youden_index)
 optimal_threshold = thresholds[optimal_idx]
 print(f"[INFO] Optimal threshold (val): {optimal_threshold:.4f}")
 
-# === Test Evaluation ===
+# === Recompile with Thresholded Metrics ===
+thresholded_metrics = [
+    tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=optimal_threshold),
+    tf.keras.metrics.AUC(name="auc"),
+    tf.keras.metrics.Precision(name="precision", thresholds=optimal_threshold),
+    tf.keras.metrics.Recall(name="recall", thresholds=optimal_threshold),
+]
+
+model.compile(
+    optimizer=tf.keras.optimizers.Adam(learning_rate=3e-5),
+    loss=FocalLoss(gamma=1.0, alpha=0.25),
+    metrics=thresholded_metrics
+)
+
+# === Evaluate on Test Set ===
 print("[INFO] Evaluating on test set...")
-results = model.evaluate(test_gen)
+results = model.evaluate(test_gen, verbose=1)
 for name, val in zip(model.metrics_names, results):
     print(f"{name}: {val:.4f}")
 
+# === Threshold-based Predictions ===
+print("[INFO] Generating test predictions with tuned threshold...")
 y_prob = model.predict(test_gen).flatten()
 y_pred = (y_prob >= optimal_threshold).astype(int)
 y_true = np.array(test_gen.classes)
@@ -90,16 +99,16 @@ print("[INFO] Classification report:")
 report = classification_report(y_true, y_pred, target_names=labels, digits=4)
 print(report)
 
-# === Save Plots and Metrics ===
+# === Save Confusion Matrix and ROC Curve ===
 save_confusion_matrix(y_true, y_pred, labels, os.path.join(output_dir, "confusion_matrix_tuned.png"))
 
 plt.figure()
-plt.plot(fpr, tpr, label=f"Validation AUC = {np.trapz(tpr, fpr):.4f}")
+plt.plot(fpr, tpr, label=f"AUC = {np.trapz(tpr, fpr):.4f}")
 plt.scatter(fpr[optimal_idx], tpr[optimal_idx], color='red', label=f"Threshold = {optimal_threshold:.4f}")
 plt.plot([0, 1], [0, 1], 'k--')
 plt.xlabel("FPR")
 plt.ylabel("TPR")
-plt.title("ROC Curve")
+plt.title("ROC Curve (Validation Set)")
 plt.legend()
 plt.savefig(os.path.join(output_dir, "roc_curve_val_based.png"))
 plt.close()
@@ -110,8 +119,6 @@ with open(os.path.join(output_dir, "optimal_threshold.txt"), "w") as f:
     f.write(report)
 
 print(f"[INFO] Evaluation completed at: {datetime.now().isoformat()}")
-
-# === Restore stdout/stderr and close file ===
 sys.stdout = sys.__stdout__
 sys.stderr = sys.__stderr__
 log_file.close()
