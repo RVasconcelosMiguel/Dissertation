@@ -7,4 +7,10 @@ model = tf.keras.Sequential([
 ])
 
 model.compile(optimizer="adam", loss=FocalLoss())
-model.save("test_model.keras")  # this should work now
+
+try:
+    model.save("test_model.keras")
+    print("✅ Model saved successfully with FocalLoss.")
+except Exception as e:
+    print("❌ Failed to save model:")
+    print(e)
