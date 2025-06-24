@@ -1,14 +1,23 @@
 # === evaluate.py ===
 import os
 import sys
+import logging
+import warnings
 from datetime import datetime
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
+# === Silence TensorFlow logging and warnings ===
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # 0 = all logs, 3 = errors only
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+tf_logger = logging.getLogger('tensorflow')
+tf_logger.setLevel(logging.ERROR)
+warnings.filterwarnings("ignore", category=FutureWarning)
+
+# === Set output directory and log file ===
 output_dir = "/home/jtstudents/rmiguel/files_to_transfer"
 os.makedirs(output_dir, exist_ok=True)
+log_file_path = os.path.join(output_dir, "evaluate_log.txt")
 
-log_file = open(os.path.join(output_dir, "evaluate_log.txt"), "w")
+log_file = open(log_file_path, "w")
 sys.stdout = log_file
 sys.stderr = log_file
 
@@ -101,4 +110,8 @@ with open(os.path.join(output_dir, "optimal_threshold.txt"), "w") as f:
     f.write(report)
 
 print(f"[INFO] Evaluation completed at: {datetime.now().isoformat()}")
+
+# === Restore stdout/stderr and close file ===
+sys.stdout = sys.__stdout__
+sys.stderr = sys.__stderr__
 log_file.close()
