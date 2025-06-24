@@ -23,6 +23,7 @@ from sklearn.metrics import classification_report, roc_curve
 from model import build_model
 from data_loader import get_generators
 from plot_utils import save_confusion_matrix
+from losses import FocalLoss  # ✅ Needed now that we use compile()
 
 # === CONFIGURATION ===
 IMG_SIZE = 224
@@ -42,6 +43,18 @@ if not os.path.isfile(WEIGHTS_PATH + ".index"):
     raise FileNotFoundError("Weights not found. Expected .index and .data* files.")
 
 model.load_weights(WEIGHTS_PATH)
+
+# === Compile the model after loading weights ===
+model.compile(
+    optimizer=tf.keras.optimizers.Adam(learning_rate=3e-5),
+    loss=FocalLoss(gamma=2.0, alpha=0.75),
+    metrics=[
+        "accuracy",
+        tf.keras.metrics.AUC(name="auc"),
+        tf.keras.metrics.Precision(name="precision"),
+        tf.keras.metrics.Recall(name="recall")
+    ]
+)
 
 # === Validation Threshold ===
 print("[INFO] Predicting validation set...")
