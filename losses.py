@@ -3,8 +3,8 @@ import tensorflow as tf
 class FocalLoss(tf.keras.losses.Loss):
     def __init__(self, gamma=2.0, alpha=0.75, **kwargs):
         super().__init__(**kwargs)
-        self.gamma = gamma
-        self.alpha = alpha
+        self.gamma = float(gamma)
+        self.alpha = float(alpha)
 
     def call(self, y_true, y_pred):
         epsilon = tf.keras.backend.epsilon()
@@ -14,9 +14,10 @@ class FocalLoss(tf.keras.losses.Loss):
         return tf.reduce_mean(loss)
 
     def get_config(self):
+        # Only pure Python types allowed here
         return {
-            "gamma": float(self.gamma),
-            "alpha": float(self.alpha),
+            "gamma": self.gamma,
+            "alpha": self.alpha,
         }
 
     @classmethod
