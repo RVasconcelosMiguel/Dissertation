@@ -103,7 +103,7 @@ metrics = [
 # === PHASE 1: HEAD TRAINING ===
 model.compile(
     optimizer=Adam(learning_rate=LR_HEAD),
-    loss=FocalLoss(gamma=1.0, alpha=0.25),
+    loss="binary_crossentropy",
     metrics=metrics
 )
 
@@ -117,7 +117,8 @@ print("Fine-tuning base model...")
 for layer in base_model.layers[:UNFREEZE_FROM_LAYER]:
     layer.trainable = False
 for layer in base_model.layers[UNFREEZE_FROM_LAYER:]:
-    layer.trainable = True
+    if not isinstance(layer, tf.keras.layers.BatchNormalization):
+        layer.trainable = True
 
 model.compile(
     optimizer=Adam(learning_rate=LR_FINE),
