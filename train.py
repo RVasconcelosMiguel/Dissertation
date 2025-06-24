@@ -14,7 +14,7 @@ from tensorflow.keras import backend as K
 from model import build_model
 from data_loader import get_generators, load_dataframes
 from plot_utils import plot_history
-from losses import FocalLoss  # Custom loss with serialization support
+from losses import FocalLoss  # Must have working get_config()
 
 # === ENVIRONMENT SETUP ===
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -71,7 +71,7 @@ EPOCHS_HEAD = 50
 EPOCHS_FINE = 50
 LR_HEAD = 1e-4
 LR_FINE = 3e-5
-MODEL_PATH = "models/efficientnetb1_isic16"  # no extension
+MODEL_PATH = "models/efficientnetb1_finetuned.keras"
 TRAIN_CSV_NAME = "Augmented_Training_labels.csv"
 
 # === DATA LOADING ===
@@ -94,7 +94,9 @@ model.compile(
 
 print("Training classification head...")
 history_head = model.fit(train_gen, validation_data=val_gen, epochs=EPOCHS_HEAD)
-model.save("models/efficientnetb1_head_trained")  # SavedModel format
+
+# Save model after head training
+model.save("models/efficientnetb1_head_trained.keras")
 save_history(history_head, "models/history_efficientnetb1_head.pkl")
 
 # === PHASE 2: FINE-TUNING ===
