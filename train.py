@@ -74,8 +74,8 @@ IMG_SIZE = 224
 BATCH_SIZE = 32
 EPOCHS_HEAD = 50
 EPOCHS_FINE = 50
-LR_HEAD = 1e-4
-LR_FINE = 3e-5
+LR_HEAD = 5e-5
+LR_FINE = 1e-5
 UNFREEZE_FROM_LAYER = 200
 MODEL_PATH = "models/efficientnetb1_finetuned_weights"
 TRAIN_CSV_NAME = "Augmented_Training_labels.csv"
@@ -92,7 +92,7 @@ class_weights = compute_class_weights(train_gen)
 model, base_model = build_model(img_size=IMG_SIZE)
 model.summary()
 
-# === METRICS WITH CUSTOM THRESHOLD ===
+# === METRICS WITH FIXED THRESHOLD ===
 metrics = [
     tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
     tf.keras.metrics.AUC(name="auc"),
