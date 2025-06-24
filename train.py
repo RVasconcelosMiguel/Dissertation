@@ -96,7 +96,7 @@ print("Training classification head...")
 history_head = model.fit(train_gen, validation_data=val_gen, epochs=EPOCHS_HEAD)
 
 # Save model after head training
-model.save("models/efficientnetb1_head_trained.keras")
+model.save("models/efficientnetb1_head_trained", save_format="tf")  # ✅ robust
 save_history(history_head, "models/history_efficientnetb1_head.pkl")
 
 # === PHASE 2: FINE-TUNING ===
@@ -120,9 +120,16 @@ model.compile(
 
 callbacks_fine = [
     EarlyStopping(monitor="val_recall", mode="max", patience=15, restore_best_weights=True),
-    ModelCheckpoint(MODEL_PATH, monitor="val_recall", mode="max", save_best_only=True),
+    ModelCheckpoint(
+        MODEL_PATH,
+        monitor="val_recall",
+        mode="max",
+        save_best_only=True,
+        save_format="tf"
+    ),
     ReduceLROnPlateau(monitor="val_recall", mode="max", factor=0.5, patience=7, min_lr=1e-7, verbose=1)
 ]
+
 
 history_fine = model.fit(
     train_gen,
