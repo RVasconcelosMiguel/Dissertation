@@ -1,5 +1,6 @@
 import tensorflow as tf
 
+@tf.keras.utils.register_keras_serializable()
 class FocalLoss(tf.keras.losses.Loss):
     def __init__(self, gamma=2.0, alpha=0.75, **kwargs):
         super().__init__(**kwargs)
@@ -14,7 +15,6 @@ class FocalLoss(tf.keras.losses.Loss):
         return tf.reduce_mean(loss)
 
     def get_config(self):
-        # Only pure Python types allowed here
         return {
             "gamma": self.gamma,
             "alpha": self.alpha,
