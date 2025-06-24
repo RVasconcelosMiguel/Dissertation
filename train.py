@@ -8,13 +8,13 @@ from sklearn.metrics import roc_curve
 import matplotlib.pyplot as plt
 
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau, Callback
 from tensorflow.keras import backend as K
 
 from model import build_model
 from data_loader import get_generators, load_dataframes
 from plot_utils import plot_history
-from losses import FocalLoss  # Must have working get_config()
+from losses import FocalLoss
 
 # === ENVIRONMENT SETUP ===
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -64,6 +64,11 @@ def compute_class_weights(generator):
         1: total / (2.0 * counts[1])
     }
 
+class RecallLogger(Callback):
+    def on_epoch_end(self, epoch, logs=None):
+        recall = logs.get("val_recall")
+        print(f"[Epoch {epoch+1}] val_recall: {recall:.4f}")
+
 # === CONFIGURATION ===
 IMG_SIZE = 224
 BATCH_SIZE = 32
@@ -71,6 +76,7 @@ EPOCHS_HEAD = 50
 EPOCHS_FINE = 50
 LR_HEAD = 1e-4
 LR_FINE = 3e-5
+UNFREEZE_FROM_LAYER = 200  # <-- less conservative than before
 MODEL_PATH = "models/efficientnetb1_finetuned_weights"
 TRAIN_CSV_NAME = "Augmented_Training_labels.csv"
 
@@ -88,20 +94,18 @@ model.summary()
 # === PHASE 1: HEAD TRAINING ===
 model.compile(
     optimizer=Adam(learning_rate=LR_HEAD),
-    loss=FocalLoss(gamma=2.0, alpha=0.75),
+    loss="binary_crossentropy",  # <-- changed from FocalLoss
     metrics=["accuracy"]
 )
 
 print("Training classification head...")
 history_head = model.fit(train_gen, validation_data=val_gen, epochs=EPOCHS_HEAD)
 
-# Save weights after head training
 model.save_weights("models/efficientnetb1_head_trained_weights")
 save_history(history_head, "models/history_efficientnetb1_head.pkl")
 
 # === PHASE 2: FINE-TUNING ===
 print("Fine-tuning base model...")
-UNFREEZE_FROM_LAYER = 300
 for layer in base_model.layers[:UNFREEZE_FROM_LAYER]:
     layer.trainable = False
 for layer in base_model.layers[UNFREEZE_FROM_LAYER:]:
@@ -109,7 +113,7 @@ for layer in base_model.layers[UNFREEZE_FROM_LAYER:]:
 
 model.compile(
     optimizer=Adam(learning_rate=LR_FINE),
-    loss=FocalLoss(gamma=2.0, alpha=0.75),
+    loss=FocalLoss(gamma=1.0, alpha=0.25),  # <-- softer focal loss
     metrics=[
         "accuracy",
         tf.keras.metrics.AUC(name="auc"),
@@ -120,14 +124,9 @@ model.compile(
 
 callbacks_fine = [
     EarlyStopping(monitor="val_recall", mode="max", patience=15, restore_best_weights=True),
-    ModelCheckpoint(
-        MODEL_PATH,
-        monitor="val_recall",
-        mode="max",
-        save_best_only=True,
-        save_weights_only=True  # ✅ Only save weights
-    ),
-    ReduceLROnPlateau(monitor="val_recall", mode="max", factor=0.5, patience=7, min_lr=1e-7, verbose=1)
+    ModelCheckpoint(MODEL_PATH, monitor="val_recall", mode="max", save_best_only=True, save_weights_only=True),
+    ReduceLROnPlateau(monitor="val_recall", mode="max", factor=0.5, patience=7, min_lr=1e-7, verbose=1),
+    RecallLogger()
 ]
 
 history_fine = model.fit(
