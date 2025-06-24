@@ -71,7 +71,7 @@ class RecallLogger(Callback):
 
 # === CONFIGURATION ===
 IMG_SIZE = 224
-BATCH_SIZE = 32
+BATCH_SIZE = 64
 EPOCHS_HEAD = 50
 EPOCHS_FINE = 50
 LR_HEAD = 5e-5
