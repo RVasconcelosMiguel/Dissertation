@@ -71,7 +71,7 @@ EPOCHS_HEAD = 50
 EPOCHS_FINE = 50
 LR_HEAD = 1e-4
 LR_FINE = 3e-5
-MODEL_PATH = "models/efficientnetb1_finetuned.keras"
+MODEL_PATH = "models/efficientnetb1_finetuned_weights"
 TRAIN_CSV_NAME = "Augmented_Training_labels.csv"
 
 # === DATA LOADING ===
@@ -95,8 +95,8 @@ model.compile(
 print("Training classification head...")
 history_head = model.fit(train_gen, validation_data=val_gen, epochs=EPOCHS_HEAD)
 
-# Save model after head training
-model.save("models/efficientnetb1_head_trained", save_format="tf")  # ✅ robust
+# Save weights after head training
+model.save_weights("models/efficientnetb1_head_trained_weights")
 save_history(history_head, "models/history_efficientnetb1_head.pkl")
 
 # === PHASE 2: FINE-TUNING ===
@@ -125,11 +125,10 @@ callbacks_fine = [
         monitor="val_recall",
         mode="max",
         save_best_only=True,
-        save_format="tf"
+        save_weights_only=True  # ✅ Only save weights
     ),
     ReduceLROnPlateau(monitor="val_recall", mode="max", factor=0.5, patience=7, min_lr=1e-7, verbose=1)
 ]
-
 
 history_fine = model.fit(
     train_gen,
@@ -138,6 +137,7 @@ history_fine = model.fit(
     callbacks=callbacks_fine,
     class_weight=class_weights
 )
+
 save_history(history_fine, "models/history_efficientnetb1_fine.pkl")
 
 # === PLOTTING & THRESHOLDING ===
