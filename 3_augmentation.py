@@ -50,7 +50,7 @@ augment = A.Compose([
     A.Rotate(limit=15, p=0.5),
     A.ElasticTransform(alpha=0.5, sigma=20, alpha_affine=5, p=0.1),
     A.GaussianBlur(blur_limit=3, p=0.1),
-    A.GaussNoise(var_limit=(5.0, 20.0), p=0.1),
+    A.ISONoise(color_shift=0.01, intensity=(0.01, 0.03), p=0.1),
     A.Resize(224, 224)
 ])
 
