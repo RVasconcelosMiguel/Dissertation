@@ -5,7 +5,6 @@ import numpy as np
 import tensorflow as tf
 from sklearn.metrics import roc_curve
 import matplotlib.pyplot as plt
-from collections import Counter
 
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau, Callback
@@ -73,7 +72,7 @@ IMG_SIZE = 224
 BATCH_SIZE = 64
 EPOCHS_HEAD = 50
 EPOCHS_FINE = 50
-LR_HEAD = 1e-3
+LR_HEAD = 1e-4
 LR_FINE = 1e-4
 UNFREEZE_FROM_LAYER = 100
 MODEL_PATH = "models/efficientnetb1_finetuned_weights"
@@ -91,6 +90,11 @@ class_weights = compute_class_weights(train_df)
 model, base_model = build_model(img_size=IMG_SIZE)
 model.summary()
 
+# === UNFREEZE TOP LAYERS FOR HEAD TRAINING ===
+for layer in base_model.layers[-30:]:
+    if not isinstance(layer, tf.keras.layers.BatchNormalization):
+        layer.trainable = True
+
 # === METRICS WITH FIXED THRESHOLD ===
 metrics = [
     tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
@@ -107,7 +111,11 @@ model.compile(
 )
 
 print("Training classification head...")
-history_head = model.fit(train_gen, validation_data=val_gen, epochs=EPOCHS_HEAD)
+callbacks_head = [
+    EarlyStopping(monitor="val_loss", patience=5, restore_best_weights=True),
+    ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=3, verbose=1)
+]
+history_head = model.fit(train_gen, validation_data=val_gen, epochs=EPOCHS_HEAD, callbacks=callbacks_head)
 model.save_weights("models/efficientnetb1_head_trained_weights")
 save_history(history_head, "models/history_efficientnetb1_head.pkl")
 
