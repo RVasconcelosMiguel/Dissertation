@@ -42,15 +42,15 @@ print(label_counts)
 target_count = 1500
 
 # === Augmentation pipeline ===
-augment = A.Compose([
+aaugment = A.Compose([
     A.HorizontalFlip(p=0.5),
     A.VerticalFlip(p=0.5),
     A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.5),
     A.HueSaturationValue(hue_shift_limit=5, sat_shift_limit=10, val_shift_limit=10, p=0.3),
     A.Rotate(limit=15, p=0.5),
-    A.ElasticTransform(alpha=0.5, sigma=20, alpha_affine=5, p=0.1),
+    A.ElasticTransform(alpha=0.5, sigma=20, p=0.1),  # Fixed
     A.GaussianBlur(blur_limit=3, p=0.1),
-    A.ISONoise(color_shift=0.01, intensity=(0.01, 0.03), p=0.1),
+    A.ISONoise(color_shift=(0.01, 0.01), intensity=(0.01, 0.03), p=0.1),  # Fixed
     A.Resize(224, 224)
 ])
 
