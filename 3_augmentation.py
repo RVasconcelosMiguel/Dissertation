@@ -35,36 +35,42 @@ for img_file in os.listdir(preprocessed_folder):
 
 # === Count class frequencies ===
 label_counts = df['label'].value_counts()
-max_count = label_counts.max()
 print("Initial class distribution:")
 print(label_counts)
 
-# === Albumentations augmentation pipeline for class 1 ===
+# === Set unified target count for both classes ===
+target_count = 1500
+
+# === Augmentation pipeline ===
 augment = A.Compose([
     A.HorizontalFlip(p=0.5),
     A.VerticalFlip(p=0.5),
-    A.RandomBrightnessContrast(p=0.5),
-    A.HueSaturationValue(p=0.5),
-    A.Rotate(limit=30, p=0.7),
-    A.ElasticTransform(alpha=1.0, sigma=50, alpha_affine=50, p=0.3),
-    A.GaussianBlur(p=0.2),
-    A.GaussNoise(p=0.2),
+    A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.5),
+    A.HueSaturationValue(hue_shift_limit=5, sat_shift_limit=10, val_shift_limit=10, p=0.3),
+    A.Rotate(limit=15, p=0.5),
+    A.ElasticTransform(alpha=0.5, sigma=20, alpha_affine=5, p=0.1),
+    A.GaussianBlur(blur_limit=3, p=0.1),
+    A.GaussNoise(var_limit=(5.0, 20.0), p=0.1),
     A.Resize(224, 224)
 ])
 
-# === Perform Augmentation for Underrepresented Classes ===
+# === Perform Augmentation to reach target_count for each class ===
 new_rows = []
 
 for cls, count in label_counts.items():
-    if count >= max_count:
-        print(f"Class '{cls}' is already balanced. Skipping.")
+    if count >= target_count:
+        print(f"Class '{cls}' already has {count} samples. Skipping.")
         continue
 
     samples = df[df['label'] == cls]
-    augment_times = (max_count - count) // count + 1
-    print(f"Class '{cls}': augmenting each sample {augment_times} times.")
+    augment_needed = target_count - count
+    augment_times = augment_needed // len(samples)
+    remainder = augment_needed % len(samples)
 
-    for _, row in tqdm(samples.iterrows(), total=len(samples), desc=f"Augmenting class {cls}"):
+    print(f"Class '{cls}': augmenting {len(samples)} samples to generate {augment_needed} new images.")
+    print(f"Each image will be augmented {augment_times} times, with {remainder} extra augmentations.")
+
+    for idx, (_, row) in enumerate(tqdm(samples.iterrows(), total=len(samples), desc=f"Augmenting class {cls}")):
         img_name = row['image']
         img_path = os.path.join(preprocessed_folder, img_name)
 
@@ -75,7 +81,9 @@ for cls, count in label_counts.items():
             print(f"Error opening {img_path}: {e}")
             continue
 
-        for i in range(augment_times):
+        reps = augment_times + (1 if idx < remainder else 0)
+
+        for i in range(reps):
             augmented = augment(image=img_np)
             aug_img = Image.fromarray(augmented['image'])
             base = os.path.splitext(img_name)[0]
