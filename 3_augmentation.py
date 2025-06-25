@@ -42,7 +42,7 @@ print(label_counts)
 target_count = 1500
 
 # === Augmentation pipeline ===
-aaugment = A.Compose([
+augment = A.Compose([
     A.HorizontalFlip(p=0.5),
     A.VerticalFlip(p=0.5),
     A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.5),
