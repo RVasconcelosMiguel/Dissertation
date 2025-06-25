@@ -70,10 +70,10 @@ def compute_class_weights(df):
 
 # === CONFIGURATION ===
 IMG_SIZE = 224
-BATCH_SIZE = 16
+BATCH_SIZE = 64
 EPOCHS_HEAD = 50
 EPOCHS_FINE = 50
-LR_HEAD = 5e-3
+LR_HEAD = 1e-3
 LR_FINE = 1e-4
 UNFREEZE_FROM_LAYER = 100
 MODEL_PATH = "models/efficientnetb1_finetuned_weights"
