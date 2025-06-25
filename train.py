@@ -3,7 +3,6 @@ import sys
 import pickle
 import numpy as np
 import tensorflow as tf
-from collections import Counter
 from sklearn.metrics import roc_curve
 import matplotlib.pyplot as plt
 
@@ -42,7 +41,7 @@ else:
 
 # === HELPER FUNCTIONS ===
 def print_distribution(name, df):
-    df['label'] = df['label'].astype(int)  # ensure labels are integers
+    df['label'] = df['label'].astype(int)
     counts = df['label'].value_counts().sort_index()
     print(f"[{name}] Class 0: {counts.get(0, 0)} | Class 1: {counts.get(1, 0)}")
 
@@ -73,8 +72,14 @@ THRESHOLD = 0.52
 
 # === DATA LOADING ===
 train_df, val_df, _ = load_dataframes(TRAIN_CSV_NAME)
+
+# Convert labels to string (fix for flow_from_dataframe with class_mode="binary")
+train_df['label'] = train_df['label'].astype(str)
+val_df['label'] = val_df['label'].astype(str)
+
 print_distribution("Train", train_df)
 print_distribution("Validation", val_df)
+
 train_gen, val_gen, test_gen = get_generators(TRAIN_CSV_NAME, IMG_SIZE, BATCH_SIZE)
 
 # === MODEL CONSTRUCTION ===
