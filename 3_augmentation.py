@@ -27,7 +27,7 @@ os.makedirs(augmented_folder, exist_ok=True)
 df = pd.read_csv(df_path, header=None, names=["image", "label"])
 df['image'] = df['image'].astype(str).apply(lambda x: x if x.endswith('.jpg') else x + '.jpg')
 if df['label'].dtype == object:
-    df['label'] = df['label'].map({'benign': '0', 'malignant': '1'}).astype(str)
+    df['label'] = df['label'].map({'benign': 0, 'malignant': 1}).astype(int)
 
 # === Copy all preprocessed images to augmented folder ===
 for img_file in os.listdir(preprocessed_folder):
