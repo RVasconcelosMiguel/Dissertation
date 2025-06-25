@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau, Callback
-from tensorflow.keras import backend as K
 
 from model import build_model
 from data_loader import get_generators, load_dataframes
@@ -43,7 +42,8 @@ else:
 
 # === HELPER FUNCTIONS ===
 def print_distribution(name, df):
-    counts = df['label'].astype(int).value_counts().sort_index()
+    df['label'] = df['label'].astype(int)  # ensure labels are integers
+    counts = df['label'].value_counts().sort_index()
     print(f"[{name}] Class 0: {counts.get(0, 0)} | Class 1: {counts.get(1, 0)}")
 
 def save_history(history, filename):
@@ -53,15 +53,6 @@ def save_history(history, filename):
         print(f"[DEBUG] History saved to {filename}")
     except Exception as e:
         print(f"[ERROR] Could not save history using pickle: {e}")
-
-def compute_class_weights(generator):
-    labels = generator.classes
-    counts = Counter(labels)
-    total = sum(counts.values())
-    return {
-        0: total / (2.0 * counts[0]),
-        1: total / (2.0 * counts[1])
-    }
 
 class RecallLogger(Callback):
     def on_epoch_end(self, epoch, logs=None):
@@ -85,7 +76,6 @@ train_df, val_df, _ = load_dataframes(TRAIN_CSV_NAME)
 print_distribution("Train", train_df)
 print_distribution("Validation", val_df)
 train_gen, val_gen, test_gen = get_generators(TRAIN_CSV_NAME, IMG_SIZE, BATCH_SIZE)
-class_weights = compute_class_weights(train_gen)
 
 # === MODEL CONSTRUCTION ===
 model, base_model = build_model(img_size=IMG_SIZE)
@@ -121,7 +111,7 @@ for layer in base_model.layers[UNFREEZE_FROM_LAYER:]:
 
 model.compile(
     optimizer=Adam(learning_rate=LR_FINE),
-    loss="binary_crossentropy",  # ← Now using BCE instead of focal
+    loss="binary_crossentropy",
     metrics=metrics
 )
 
@@ -136,8 +126,7 @@ history_fine = model.fit(
     train_gen,
     validation_data=val_gen,
     epochs=EPOCHS_FINE,
-    callbacks=callbacks_fine,
-    class_weight=class_weights
+    callbacks=callbacks_fine
 )
 
 save_history(history_fine, "models/history_efficientnetb1_fine.pkl")
@@ -147,10 +136,15 @@ plot_history({"Head": history_head, "Fine": history_fine}, output_dir, ["accurac
 
 y_val_prob = model.predict(val_gen).flatten()
 y_val_true = np.array(val_gen.classes)
+
 fpr, tpr, thresholds = roc_curve(y_val_true, y_val_prob)
 youden_index = tpr - fpr
 optimal_idx = np.argmax(youden_index)
 optimal_threshold = thresholds[optimal_idx]
+
+if not np.isfinite(optimal_threshold):
+    print("[WARNING] Invalid threshold detected; defaulting to 0.5")
+    optimal_threshold = 0.5
 
 with open(os.path.join(output_dir, "optimal_threshold_val.txt"), "w") as f:
     f.write(f"Optimal threshold from validation: {optimal_threshold:.4f}\n")
