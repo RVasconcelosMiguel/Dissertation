@@ -1,20 +1,23 @@
 import os
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.metrics import confusion_matrix
-from sklearn.metrics import roc_curve, auc
+from sklearn.metrics import confusion_matrix, roc_curve, auc
 
 def plot_history(histories, save_path, metrics):
+    os.makedirs(save_path, exist_ok=True)
+
     for metric in metrics:
         plt.figure(figsize=(8, 5))
         for name, hist in histories.items():
             history_dict = hist.history if hasattr(hist, "history") else hist
             if metric in history_dict:
                 plt.plot(history_dict[metric], label=f"{name} - train")
-                plt.plot(history_dict.get(f"val_{metric}", []), label=f"{name} - val")
+                val_metric = history_dict.get(f"val_{metric}", [])
+                if val_metric:
+                    plt.plot(val_metric, label=f"{name} - val")
         plt.title(f"{metric.capitalize()} over Epochs")
         plt.xlabel("Epoch")
-        plt.ylabel(metric)
+        plt.ylabel(metric.capitalize())
         plt.legend()
         plt.grid(True)
         metric_filename = f"{metric}_curve.png"
@@ -23,7 +26,9 @@ def plot_history(histories, save_path, metrics):
         plt.close()
 
 def save_confusion_matrix(y_true, y_pred, labels, save_path):
-    cm = confusion_matrix(y_true, y_pred)
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+    cm = confusion_matrix(y_true, y_pred, labels=range(len(labels)))
     plt.figure(figsize=(6, 4))
     sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
                 xticklabels=labels, yticklabels=labels)
@@ -34,8 +39,9 @@ def save_confusion_matrix(y_true, y_pred, labels, save_path):
     plt.savefig(save_path)
     plt.close()
 
-
 def save_roc_curve(y_true, y_scores, save_path):
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
     fpr, tpr, thresholds = roc_curve(y_true, y_scores)
     roc_auc = auc(fpr, tpr)
 

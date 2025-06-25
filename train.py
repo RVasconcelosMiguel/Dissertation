@@ -5,6 +5,7 @@ import numpy as np
 import tensorflow as tf
 from sklearn.metrics import roc_curve
 import matplotlib.pyplot as plt
+from collections import Counter
 
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau, Callback
@@ -41,8 +42,7 @@ else:
 
 # === HELPER FUNCTIONS ===
 def print_distribution(name, df):
-    df['label'] = df['label'].astype(int)
-    counts = df['label'].value_counts().sort_index()
+    counts = df['label'].astype(int).value_counts().sort_index()
     print(f"[{name}] Class 0: {counts.get(0, 0)} | Class 1: {counts.get(1, 0)}")
 
 def save_history(history, filename):
@@ -58,6 +58,16 @@ class RecallLogger(Callback):
         recall = logs.get("val_recall")
         print(f"[Epoch {epoch+1}] val_recall: {recall:.4f}")
 
+def compute_class_weights(df):
+    labels = df['label'].astype(int)
+    total = len(labels)
+    count_0 = (labels == 0).sum()
+    count_1 = (labels == 1).sum()
+    return {
+        0: total / (2.0 * count_0),
+        1: total / (2.0 * count_1)
+    }
+
 # === CONFIGURATION ===
 IMG_SIZE = 224
 BATCH_SIZE = 16
@@ -72,15 +82,10 @@ THRESHOLD = 0.52
 
 # === DATA LOADING ===
 train_df, val_df, _ = load_dataframes(TRAIN_CSV_NAME)
-
-# Convert labels to string (fix for flow_from_dataframe with class_mode="binary")
-train_df['label'] = train_df['label'].astype(str)
-val_df['label'] = val_df['label'].astype(str)
-
 print_distribution("Train", train_df)
 print_distribution("Validation", val_df)
-
 train_gen, val_gen, test_gen = get_generators(TRAIN_CSV_NAME, IMG_SIZE, BATCH_SIZE)
+class_weights = compute_class_weights(train_df)
 
 # === MODEL CONSTRUCTION ===
 model, base_model = build_model(img_size=IMG_SIZE)
@@ -131,7 +136,8 @@ history_fine = model.fit(
     train_gen,
     validation_data=val_gen,
     epochs=EPOCHS_FINE,
-    callbacks=callbacks_fine
+    callbacks=callbacks_fine,
+    class_weight=class_weights
 )
 
 save_history(history_fine, "models/history_efficientnetb1_fine.pkl")
