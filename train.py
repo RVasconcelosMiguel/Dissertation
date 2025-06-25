@@ -112,7 +112,7 @@ model.compile(
 
 print("Training classification head...")
 callbacks_head = [
-    EarlyStopping(monitor="val_loss", patience=5, restore_best_weights=True),
+    EarlyStopping(monitor="val_accuracy", patience=10, restore_best_weights=True),
     ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=3, verbose=1)
 ]
 history_head = model.fit(train_gen, validation_data=val_gen, epochs=EPOCHS_HEAD, callbacks=callbacks_head)
