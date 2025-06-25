@@ -14,7 +14,6 @@ from tensorflow.keras import backend as K
 from model import build_model
 from data_loader import get_generators, load_dataframes
 from plot_utils import plot_history
-from losses import FocalLoss
 
 # === ENVIRONMENT SETUP ===
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -74,8 +73,8 @@ IMG_SIZE = 224
 BATCH_SIZE = 64
 EPOCHS_HEAD = 50
 EPOCHS_FINE = 50
-LR_HEAD = 0#5e-3
-LR_FINE = 1e-4
+LR_HEAD = 5e-3
+LR_FINE = 1e-5
 UNFREEZE_FROM_LAYER = 100
 MODEL_PATH = "models/efficientnetb1_finetuned_weights"
 TRAIN_CSV_NAME = "Augmented_Training_labels.csv"
@@ -122,7 +121,7 @@ for layer in base_model.layers[UNFREEZE_FROM_LAYER:]:
 
 model.compile(
     optimizer=Adam(learning_rate=LR_FINE),
-    loss=FocalLoss(gamma=1.0, alpha=0.25),
+    loss="binary_crossentropy",  # ← Now using BCE instead of focal
     metrics=metrics
 )
 
