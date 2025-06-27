@@ -77,16 +77,15 @@ EPOCHS = 100
 LR = 1e-4
 UNFREEZE_FROM_LAYER = 150
 MODEL_PATH = "models/efficientnetb1_finetuned_weights"
-TRAIN_CSV_NAME = "Augmented_Training_labels.csv"
 
 THRESHOLD = 0.3  # set default threshold
 CALCULATE_OPTIMAL_THRESHOLD = False  # if True, calculate from validation set
 
 # === DATA LOADING ===
-train_df, val_df, _ = load_dataframes(TRAIN_CSV_NAME)
+train_df, val_df, _ = load_dataframes(None)
 print_distribution("Train", train_df)
 print_distribution("Validation", val_df)
-train_gen, val_gen, test_gen = get_generators(TRAIN_CSV_NAME, IMG_SIZE, BATCH_SIZE)
+train_gen, val_gen, test_gen = get_generators(None, IMG_SIZE, BATCH_SIZE)
 class_weights = compute_class_weights(train_df)
 
 # === MODEL CONSTRUCTION ===
