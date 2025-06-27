@@ -10,8 +10,8 @@ input_folders = {
     'test': '/raid/DATASETS/rmiguel_datasets/ISIC16/Testing_Data'
 }
 output_folders = {
-    'train': '/raid/DATASETS/rmiguel_datasets/ISIC16/Preprocessed_Training_Data',
-    'test': '/raid/DATASETS/rmiguel_datasets/ISIC16/Preprocessed_Testing_Data'
+    'train': '/raid/DATASETS/rmiguel_datasets/ISIC16/Classification/Preprocessed_Training_Data',
+    'test': '/raid/DATASETS/rmiguel_datasets/ISIC16/Classification/Preprocessed_Testing_Data'
 }
 
 # === Preprocessing Steps ===
