@@ -3,6 +3,7 @@ import sys
 import pickle
 import numpy as np
 import tensorflow as tf
+import time
 from sklearn.metrics import roc_curve
 import matplotlib.pyplot as plt
 
@@ -14,6 +15,8 @@ from data_loader import get_generators, load_dataframes
 from plot_utils import plot_history
 
 # === ENVIRONMENT SETUP ===
+start_time = time.time()
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 output_dir = "/home/jtstudents/rmiguel/files_to_transfer"
@@ -71,11 +74,13 @@ def compute_class_weights(df):
 IMG_SIZE = 224
 BATCH_SIZE = 32
 EPOCHS = 100
-LR = 1e-4  # very low LR for full model finetuning
-UNFREEZE_FROM_LAYER = 150  # unfreeze top ~100 layers
+LR = 1e-4
+UNFREEZE_FROM_LAYER = 150
 MODEL_PATH = "models/efficientnetb1_finetuned_weights"
 TRAIN_CSV_NAME = "Augmented_Training_labels.csv"
-THRESHOLD = 0.52
+
+THRESHOLD = 0.3  # set default threshold
+CALCULATE_OPTIMAL_THRESHOLD = False  # if True, calculate from validation set
 
 # === DATA LOADING ===
 train_df, val_df, _ = load_dataframes(TRAIN_CSV_NAME)
@@ -88,14 +93,14 @@ class_weights = compute_class_weights(train_df)
 model, base_model = build_model(img_size=IMG_SIZE)
 model.summary()
 
-# === UNFREEZE TOP LAYERS FOR SINGLE TRAINING ===
+# === UNFREEZE TOP LAYERS ===
 for layer in base_model.layers[:UNFREEZE_FROM_LAYER]:
     layer.trainable = False
 for layer in base_model.layers[UNFREEZE_FROM_LAYER:]:
     if not isinstance(layer, tf.keras.layers.BatchNormalization):
         layer.trainable = True
 
-# === METRICS WITH FIXED THRESHOLD ===
+# === COMPILE MODEL ===
 metrics = [
     tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
     tf.keras.metrics.AUC(name="auc"),
@@ -103,13 +108,13 @@ metrics = [
     tf.keras.metrics.Recall(name="recall", thresholds=THRESHOLD),
 ]
 
-# === COMPILE & TRAIN ===
 model.compile(
     optimizer=Adam(learning_rate=LR),
     loss="binary_crossentropy",
     metrics=metrics
 )
 
+# === TRAINING ===
 print("Training full model with top layers unfrozen...")
 callbacks = [
     EarlyStopping(monitor="val_auc", mode="max", patience=20, restore_best_weights=True),
@@ -128,22 +133,33 @@ history = model.fit(
 
 save_history(history, "models/history_efficientnetb1_finetuned.pkl")
 
-# === PLOTTING & THRESHOLDING ===
+# === PLOTTING ===
 plot_history({"Finetune": history}, output_dir, ["accuracy", "loss", "auc", "recall"])
+
+# === THRESHOLDING ===
+print("[INFO] Calculating or setting threshold...")
 
 y_val_prob = model.predict(val_gen).flatten()
 y_val_true = np.array(val_gen.classes)
 
-fpr, tpr, thresholds = roc_curve(y_val_true, y_val_prob)
-youden_index = tpr - fpr
-optimal_idx = np.argmax(youden_index)
-optimal_threshold = thresholds[optimal_idx]
-
-if not np.isfinite(optimal_threshold):
-    print("[WARNING] Invalid threshold detected; defaulting to 0.5")
-    optimal_threshold = 0.5
+if CALCULATE_OPTIMAL_THRESHOLD:
+    fpr, tpr, thresholds = roc_curve(y_val_true, y_val_prob)
+    youden_index = tpr - fpr
+    optimal_idx = np.argmax(youden_index)
+    THRESHOLD = thresholds[optimal_idx]
+    if not np.isfinite(THRESHOLD):
+        print("[WARNING] Invalid threshold detected; defaulting to 0.5")
+        THRESHOLD = 0.5
+    print(f"[INFO] Using optimal validation threshold: {THRESHOLD:.4f}")
+else:
+    print(f"[INFO] Using fixed configured threshold: {THRESHOLD:.4f}")
 
 with open(os.path.join(output_dir, "optimal_threshold_val.txt"), "w") as f:
-    f.write(f"Optimal threshold from validation: {optimal_threshold:.4f}\n")
+    f.write(f"Threshold used: {THRESHOLD:.4f}\n")
 
-print(f"[INFO] Saved optimal validation threshold : {optimal_threshold:.4f}")
+# === TRAINING TIME ===
+elapsed_time = time.time() - start_time
+minutes = int(elapsed_time // 60)
+seconds = int(elapsed_time % 60)
+print(f"[INFO] Total training time: {minutes}m {seconds}s")
+log_file.close()
