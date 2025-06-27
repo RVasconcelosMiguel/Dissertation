@@ -71,7 +71,7 @@ def compute_class_weights(df):
 IMG_SIZE = 224
 BATCH_SIZE = 64
 EPOCHS_HEAD = 50
-EPOCHS_FINE = 50
+EPOCHS_FINE = 0#50
 LR_HEAD = 1e-4
 LR_FINE = 1e-4
 UNFREEZE_FROM_LAYER = 100
@@ -90,10 +90,9 @@ class_weights = compute_class_weights(train_df)
 model, base_model = build_model(img_size=IMG_SIZE)
 model.summary()
 
-# === UNFREEZE TOP LAYERS FOR HEAD TRAINING ===
-for layer in base_model.layers[-30:]:
-    if not isinstance(layer, tf.keras.layers.BatchNormalization):
-        layer.trainable = True
+# === FREEZE BASE MODEL FOR HEAD TRAINING ===
+for layer in base_model.layers:
+    layer.trainable = False
 
 # === METRICS WITH FIXED THRESHOLD ===
 metrics = [
@@ -112,9 +111,10 @@ model.compile(
 
 print("Training classification head...")
 callbacks_head = [
-    EarlyStopping(monitor="val_accuracy", patience=10, restore_best_weights=True),
-    ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=3, verbose=1)
+    EarlyStopping(monitor="val_loss", patience=15, min_delta=0.002, restore_best_weights=True),
+    ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=5, verbose=1)
 ]
+
 history_head = model.fit(train_gen, validation_data=val_gen, epochs=EPOCHS_HEAD, callbacks=callbacks_head)
 model.save_weights("models/efficientnetb1_head_trained_weights")
 save_history(history_head, "models/history_efficientnetb1_head.pkl")
