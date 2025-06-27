@@ -70,11 +70,9 @@ def compute_class_weights(df):
 # === CONFIGURATION ===
 IMG_SIZE = 224
 BATCH_SIZE = 64
-EPOCHS_HEAD = 50
-EPOCHS_FINE = 0#50
-LR_HEAD = 1e-4
-LR_FINE = 1e-4
-UNFREEZE_FROM_LAYER = 100
+EPOCHS = 50
+LR = 1e-5  # very low LR for full model finetuning
+UNFREEZE_FROM_LAYER = 100  # unfreeze top ~100 layers
 MODEL_PATH = "models/efficientnetb1_finetuned_weights"
 TRAIN_CSV_NAME = "Augmented_Training_labels.csv"
 THRESHOLD = 0.52
@@ -90,9 +88,12 @@ class_weights = compute_class_weights(train_df)
 model, base_model = build_model(img_size=IMG_SIZE)
 model.summary()
 
-# === FREEZE BASE MODEL FOR HEAD TRAINING ===
-for layer in base_model.layers:
+# === UNFREEZE TOP LAYERS FOR SINGLE TRAINING ===
+for layer in base_model.layers[:UNFREEZE_FROM_LAYER]:
     layer.trainable = False
+for layer in base_model.layers[UNFREEZE_FROM_LAYER:]:
+    if not isinstance(layer, tf.keras.layers.BatchNormalization):
+        layer.trainable = True
 
 # === METRICS WITH FIXED THRESHOLD ===
 metrics = [
@@ -102,56 +103,33 @@ metrics = [
     tf.keras.metrics.Recall(name="recall", thresholds=THRESHOLD),
 ]
 
-# === PHASE 1: HEAD TRAINING ===
+# === COMPILE & TRAIN ===
 model.compile(
-    optimizer=Adam(learning_rate=LR_HEAD),
+    optimizer=Adam(learning_rate=LR),
     loss="binary_crossentropy",
     metrics=metrics
 )
 
-print("Training classification head...")
-callbacks_head = [
-    EarlyStopping(monitor="val_loss", patience=15, min_delta=0.002, restore_best_weights=True),
-    ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=5, verbose=1)
-]
-
-history_head = model.fit(train_gen, validation_data=val_gen, epochs=EPOCHS_HEAD, callbacks=callbacks_head)
-model.save_weights("models/efficientnetb1_head_trained_weights")
-save_history(history_head, "models/history_efficientnetb1_head.pkl")
-
-# === PHASE 2: FINE-TUNING ===
-print("Fine-tuning base model...")
-for layer in base_model.layers[:UNFREEZE_FROM_LAYER]:
-    layer.trainable = False
-for layer in base_model.layers[UNFREEZE_FROM_LAYER:]:
-    if not isinstance(layer, tf.keras.layers.BatchNormalization):
-        layer.trainable = True
-
-model.compile(
-    optimizer=Adam(learning_rate=LR_FINE),
-    loss="binary_crossentropy",
-    metrics=metrics
-)
-
-callbacks_fine = [
+print("Training full model with top layers unfrozen...")
+callbacks = [
     EarlyStopping(monitor="val_auc", mode="max", patience=15, restore_best_weights=True),
     ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
     ReduceLROnPlateau(monitor="val_auc", mode="max", factor=0.5, patience=7, min_lr=1e-7, verbose=1),
     RecallLogger()
 ]
 
-history_fine = model.fit(
+history = model.fit(
     train_gen,
     validation_data=val_gen,
-    epochs=EPOCHS_FINE,
-    callbacks=callbacks_fine,
+    epochs=EPOCHS,
+    callbacks=callbacks,
     class_weight=class_weights
 )
 
-save_history(history_fine, "models/history_efficientnetb1_fine.pkl")
+save_history(history, "models/history_efficientnetb1_finetuned.pkl")
 
 # === PLOTTING & THRESHOLDING ===
-plot_history({"Head": history_head, "Fine": history_fine}, output_dir, ["accuracy", "loss", "auc", "recall"])
+plot_history({"Finetune": history}, output_dir, ["accuracy", "loss", "auc", "recall"])
 
 y_val_prob = model.predict(val_gen).flatten()
 y_val_true = np.array(val_gen.classes)

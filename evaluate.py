@@ -25,12 +25,11 @@ print(f"[INFO] Evaluation started at: {datetime.now().isoformat()}")
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.metrics import classification_report, roc_curve
+from sklearn.metrics import classification_report, roc_curve, roc_auc_score
 
 from model import build_model
 from data_loader import get_generators
 from plot_utils import save_confusion_matrix
-from losses import FocalLoss
 
 # === CONFIGURATION ===
 IMG_SIZE = 224
@@ -45,28 +44,31 @@ _, val_gen, test_gen = get_generators(TRAIN_CSV_NAME, IMG_SIZE, BATCH_SIZE)
 print("[INFO] Building model architecture...")
 model, _ = build_model(img_size=IMG_SIZE)
 
-# === Predict Validation for Threshold Tuning ===
+# === Load Weights ===
 print("[INFO] Loading weights from:", WEIGHTS_PATH)
 if not os.path.exists(WEIGHTS_PATH + ".index"):
     raise FileNotFoundError(f"Missing weights: {WEIGHTS_PATH}.index")
-
 model.load_weights(WEIGHTS_PATH)
 
-# === Temporary Compilation (for threshold selection) ===
+# === Compile (Temporary) for Threshold Selection ===
 model.compile(
     optimizer="adam",
-    loss=FocalLoss(gamma=1.0, alpha=0.25),
+    loss="binary_crossentropy",
     metrics=["accuracy"]
 )
 
 print("[INFO] Predicting validation probabilities...")
 y_val_prob = model.predict(val_gen).flatten()
 y_val_true = np.array(val_gen.classes)
+
 fpr, tpr, thresholds = roc_curve(y_val_true, y_val_prob)
 youden_index = tpr - fpr
 optimal_idx = np.argmax(youden_index)
 optimal_threshold = thresholds[optimal_idx]
+roc_auc = roc_auc_score(y_val_true, y_val_prob)
+
 print(f"[INFO] Optimal threshold (val): {optimal_threshold:.4f}")
+print(f"[INFO] Validation ROC AUC: {roc_auc:.4f}")
 
 # === Recompile with Thresholded Metrics ===
 thresholded_metrics = [
@@ -78,7 +80,7 @@ thresholded_metrics = [
 
 model.compile(
     optimizer=tf.keras.optimizers.Adam(learning_rate=3e-5),
-    loss=FocalLoss(gamma=1.0, alpha=0.25),
+    loss="binary_crossentropy",
     metrics=thresholded_metrics
 )
 
@@ -103,7 +105,7 @@ print(report)
 save_confusion_matrix(y_true, y_pred, labels, os.path.join(output_dir, "confusion_matrix_tuned.png"))
 
 plt.figure()
-plt.plot(fpr, tpr, label=f"AUC = {np.trapz(tpr, fpr):.4f}")
+plt.plot(fpr, tpr, label=f"AUC = {roc_auc:.4f}")
 plt.scatter(fpr[optimal_idx], tpr[optimal_idx], color='red', label=f"Threshold = {optimal_threshold:.4f}")
 plt.plot([0, 1], [0, 1], 'k--')
 plt.xlabel("FPR")
@@ -115,7 +117,8 @@ plt.close()
 
 # === Save Report ===
 with open(os.path.join(output_dir, "optimal_threshold.txt"), "w") as f:
-    f.write(f"Optimal threshold from validation: {optimal_threshold:.4f}\n\n")
+    f.write(f"Optimal threshold from validation: {optimal_threshold:.4f}\n")
+    f.write(f"Validation ROC AUC: {roc_auc:.4f}\n\n")
     f.write(report)
 
 print(f"[INFO] Evaluation completed at: {datetime.now().isoformat()}")

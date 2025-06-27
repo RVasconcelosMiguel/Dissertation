@@ -3,7 +3,7 @@ from tensorflow.keras.layers import Input, GlobalAveragePooling2D, Dropout, Dens
 from tensorflow.keras.models import Model
 from tensorflow.keras.regularizers import l2
 
-def build_model(img_size=224, dropout=0.3, l2_lambda=1e-5):
+def build_model(img_size=224, dropout=0.5, l2_lambda=1e-4):
     input_tensor = Input(shape=(img_size, img_size, 3))
     base_model = EfficientNetB1(include_top=False, weights="imagenet", input_tensor=input_tensor)
 
