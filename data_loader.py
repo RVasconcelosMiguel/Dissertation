@@ -1,3 +1,8 @@
+import os
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+
 def load_dataframes(train_csv_name):
     """
     Loads and prepares training and testing DataFrames.
@@ -42,3 +47,62 @@ def load_dataframes(train_csv_name):
     df_val_final.drop(columns=['base_image'], inplace=True)
 
     return df_train_final, df_val_final, df_test
+
+
+
+def get_generators(train_csv_name, img_size=224, batch_size=64):
+    """
+    Generates training, validation, and testing generators using ImageDataGenerator.
+    Chooses appropriate image directories based on the CSV name (augmented or not).
+    """
+    train_df, val_df, test_df = load_dataframes(train_csv_name)
+
+    # Explicitly ensure all labels are strings (required for binary classification mode)
+    train_df['label'] = train_df['label'].astype(str)
+    val_df['label'] = val_df['label'].astype(str)
+    test_df['label'] = test_df['label'].astype(str)
+
+    # Choose the appropriate image directory based on augmentation
+    train_dir = "/raid/DATASETS/rmiguel_datasets/ISIC16/Augmented_Training_Data" \
+        if "Augmented" in train_csv_name else \
+        "/raid/DATASETS/rmiguel_datasets/ISIC16/Preprocessed_Training_Data"
+
+    test_dir = "/raid/DATASETS/rmiguel_datasets/ISIC16/Preprocessed_Testing_Data"
+
+    datagen = ImageDataGenerator(rescale=1.0 / 255)
+
+    train_gen = datagen.flow_from_dataframe(
+        dataframe=train_df,
+        directory=train_dir,
+        x_col="image",
+        y_col="label",
+        target_size=(img_size, img_size),
+        class_mode="binary",
+        batch_size=batch_size,
+        shuffle=True,
+        seed=42
+    )
+
+    val_gen = datagen.flow_from_dataframe(
+        dataframe=val_df,
+        directory=train_dir,
+        x_col="image",
+        y_col="label",
+        target_size=(img_size, img_size),
+        class_mode="binary",
+        batch_size=batch_size,
+        shuffle=False
+    )
+
+    test_gen = datagen.flow_from_dataframe(
+        dataframe=test_df,
+        directory=test_dir,
+        x_col="image",
+        y_col="label",
+        target_size=(img_size, img_size),
+        class_mode="binary",
+        batch_size=batch_size,
+        shuffle=False
+    )
+
+    return train_gen, val_gen, test_gen
