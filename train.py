@@ -70,7 +70,7 @@ def compute_class_weights(df):
 # === CONFIGURATION ===
 IMG_SIZE = 224
 BATCH_SIZE = 64
-EPOCHS = 50
+EPOCHS = 80
 LR = 1e-5  # very low LR for full model finetuning
 UNFREEZE_FROM_LAYER = 100  # unfreeze top ~100 layers
 MODEL_PATH = "models/efficientnetb1_finetuned_weights"
@@ -112,7 +112,7 @@ model.compile(
 
 print("Training full model with top layers unfrozen...")
 callbacks = [
-    EarlyStopping(monitor="val_auc", mode="max", patience=15, restore_best_weights=True),
+    EarlyStopping(monitor="val_auc", mode="max", patience=20, restore_best_weights=True),
     ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
     ReduceLROnPlateau(monitor="val_auc", mode="max", factor=0.5, patience=7, min_lr=1e-7, verbose=1),
     RecallLogger()
