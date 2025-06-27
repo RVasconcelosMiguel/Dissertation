@@ -7,7 +7,7 @@ def load_dataframes(train_csv_name):
     Loads and prepares training, validation, and testing DataFrames
     from pre-created split CSVs without leakage.
     """
-    base_path = "/raid/DATASETS/rmiguel_datasets/ISIC16/Classification/Split"
+    base_path = train_csv_name
     test_csv_path = "/raid/DATASETS/rmiguel_datasets/ISIC16/CSV/Testing_labels.csv"
 
     # Load CSV files

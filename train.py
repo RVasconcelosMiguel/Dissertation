@@ -82,7 +82,7 @@ THRESHOLD = 0.3  # set default threshold
 CALCULATE_OPTIMAL_THRESHOLD = False  # if True, calculate from validation set
 
 # === DATA LOADING ===
-train_df, val_df, _ = load_dataframes(None)
+train_df, val_df, _ = load_dataframes("/raid/DATASETS/rmiguel_datasets/ISIC16/Classification/Split")
 print_distribution("Train", train_df)
 print_distribution("Validation", val_df)
 train_gen, val_gen, test_gen = get_generators(None, IMG_SIZE, BATCH_SIZE)
