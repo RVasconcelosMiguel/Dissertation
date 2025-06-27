@@ -71,7 +71,7 @@ def compute_class_weights(df):
 IMG_SIZE = 224
 BATCH_SIZE = 64
 EPOCHS = 80
-LR = 1e-5  # very low LR for full model finetuning
+LR = 6e-6  # very low LR for full model finetuning
 UNFREEZE_FROM_LAYER = 100  # unfreeze top ~100 layers
 MODEL_PATH = "models/efficientnetb1_finetuned_weights"
 TRAIN_CSV_NAME = "Augmented_Training_labels.csv"
