@@ -108,8 +108,8 @@ for _, row in val_df.iterrows():
     val_rows.append({'image': img_name, 'label': row['label']})
 
 # === Save CSVs ===
-pd.DataFrame(train_aug_rows).to_csv(os.path.join(split_base, "train_labels.csv"), index=False, header=False)
-pd.DataFrame(val_rows).to_csv(os.path.join(split_base, "val_labels.csv"), index=False, header=False)
+pd.DataFrame(train_aug_rows).to_csv(os.path.join(split_base, "train/train_labels.csv"), index=False, header=False)
+pd.DataFrame(val_rows).to_csv(os.path.join(split_base, "val/val_labels.csv"), index=False, header=False)
 
 print(f"\n[INFO] Final TRAIN images: {len(train_aug_rows)}")
 print(f"[INFO] Final VAL images: {len(val_rows)}")
