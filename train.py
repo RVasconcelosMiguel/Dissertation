@@ -158,7 +158,7 @@ if CALCULATE_OPTIMAL_THRESHOLD:
         THRESHOLD = 0.5
     print(f"[INFO] Using optimal validation threshold: {THRESHOLD:.4f}")
 else:
-    print(f"[INFO] Using fixed configured threshold: {THRESHOLD:.4f}")
+    print(f"[INFO] Using fixed configured threshold : {THRESHOLD:.4f}")
 
 with open(os.path.join(output_dir, "optimal_threshold_val.txt"), "w") as f:
     f.write(f"Threshold used: {THRESHOLD:.4f}\n")
