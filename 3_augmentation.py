@@ -60,7 +60,7 @@ df['image'] = df['image'].astype(str).apply(lambda x: x if x.endswith('.jpg') el
 df['label'] = df['label'].map({'benign': 0, 'malignant': 1}).astype(int)
 
 # === Split before augmentation ===
-train_df, val_df = train_test_split(df, stratify=df['label'], test_size=0.15, random_state=42)
+train_df, val_df = train_test_split(df, stratify=df['label'], test_size=0.30, random_state=42)
 
 # === Augmentation pipeline ===
 augment = A.Compose([

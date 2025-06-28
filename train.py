@@ -80,8 +80,8 @@ BATCH_SIZE = 32
 EPOCHS = 100
 LR = 1e-4
 UNFREEZE_FROM_LAYER = 100
-DROPOUT = 0.2
-L2_REG = 0
+DROPOUT = 0.3
+L2_REG = 1e-4
 CALCULATE_OPTIMAL_THRESHOLD = True  # now set to True for this run
 THRESHOLD = 0.5  # fallback threshold if CALCULATE_OPTIMAL_THRESHOLD is False
 
