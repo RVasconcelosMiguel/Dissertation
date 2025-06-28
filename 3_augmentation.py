@@ -75,7 +75,7 @@ augment = A.Compose([
 ])
 
 # === Augment training set to balance classes ===
-target_count = 1250
+target_count = 509
 train_aug_rows = []
 
 label_counts = train_df['label'].value_counts()
