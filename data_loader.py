@@ -23,8 +23,8 @@ def load_dataframes(file_path):
 def get_generators(img_size, batch_size):
 
     train_df = load_dataframes(os.path.join(train_folder, "train_labels.csv"))
-    val_df = load_dataframes(os.path.join(train_folder, "val_labels.csv"))
-    test_df = load_dataframes(os.path.join(train_folder, "test_labels.csv"))
+    val_df = load_dataframes(os.path.join(val_folder, "val_labels.csv"))
+    test_df = load_dataframes(os.path.join(test_folder, "test_labels.csv"))
 
     datagen = ImageDataGenerator(rescale=1.0 / 255)
 
