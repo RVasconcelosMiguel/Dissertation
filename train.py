@@ -5,6 +5,7 @@ import numpy as np
 import tensorflow as tf
 import time
 from sklearn.metrics import precision_recall_curve
+from sklearn.utils.class_weight import compute_class_weight
 import matplotlib.pyplot as plt
 
 from tensorflow.keras.optimizers import Adam
@@ -67,13 +68,10 @@ class RecallLogger(Callback):
 
 def compute_class_weights(df):
     labels = df['label'].astype(int)
-    total = len(labels)
-    count_0 = (labels == 0).sum()
-    count_1 = (labels == 1).sum()
-    return {
-        0: total / (2.0 * count_0),
-        1: total / (2.0 * count_1)
-    }
+    classes = np.unique(labels)
+    weights = compute_class_weight('balanced', classes=classes, y=labels)
+    return dict(zip(classes, weights))
+
 
 # === CONFIGURATION ===
 IMG_SIZE = 240
@@ -117,7 +115,7 @@ metrics = [
 
 model.compile(
     optimizer=Adam(learning_rate=LR),
-    loss=focal_loss(alpha=0.25, gamma=2.0),  # new focal loss
+    loss="binary_crossentropy",  # revert to BCE
     metrics=metrics
 )
 
