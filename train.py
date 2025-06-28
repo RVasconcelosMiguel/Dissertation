@@ -4,7 +4,7 @@ import pickle
 import numpy as np
 import tensorflow as tf
 import time
-from sklearn.metrics import roc_curve
+from sklearn.metrics import precision_recall_curve
 import matplotlib.pyplot as plt
 
 from tensorflow.keras.optimizers import Adam
@@ -78,12 +78,12 @@ def compute_class_weights(df):
 IMG_SIZE = 240
 BATCH_SIZE = 32
 EPOCHS = 100
-LR = 1e-4
+LR = 1e-5  # reduced learning rate for fine-tuning
 UNFREEZE_FROM_LAYER = 100
 DROPOUT = 0.3
 L2_REG = 1e-4
-CALCULATE_OPTIMAL_THRESHOLD = True  # now set to True for this run
-THRESHOLD = 0.5  # fallback threshold if CALCULATE_OPTIMAL_THRESHOLD is False
+CALCULATE_OPTIMAL_THRESHOLD = True
+THRESHOLD = 0.5  # fallback threshold
 
 # === DATA LOADING ===
 train_df, val_df, test_df, train_gen, val_gen, test_gen = get_generators(IMG_SIZE, BATCH_SIZE)
@@ -93,7 +93,6 @@ print_distribution("Validation", val_df)
 print_distribution("Test", test_df)
 
 class_weights = compute_class_weights(train_df)
-
 print(f"Class weights {class_weights}\n")
 
 # === MODEL CONSTRUCTION ===
@@ -150,16 +149,19 @@ y_val_prob = model.predict(val_gen).flatten()
 y_val_true = np.array(val_gen.classes)
 
 if CALCULATE_OPTIMAL_THRESHOLD:
-    fpr, tpr, thresholds = roc_curve(y_val_true, y_val_prob)
-    youden_index = tpr - fpr
-    optimal_idx = np.argmax(youden_index)
+    # F1-maximising threshold calculation
+    from sklearn.metrics import precision_recall_curve
+
+    precision, recall, thresholds = precision_recall_curve(y_val_true, y_val_prob)
+    f1 = 2 * (precision * recall) / (precision + recall + 1e-8)
+    optimal_idx = np.argmax(f1)
     optimal_threshold = thresholds[optimal_idx]
 
     if not np.isfinite(optimal_threshold):
         print("[WARNING] Invalid threshold detected; defaulting to 0.5")
         optimal_threshold = 0.5
 
-    print(f"[INFO] Using optimal validation threshold: {optimal_threshold:.4f}")
+    print(f"[INFO] Using optimal validation threshold (F1-maximised): {optimal_threshold:.4f}")
 else:
     optimal_threshold = THRESHOLD
     print(f"[INFO] Using fixed configured threshold: {optimal_threshold:.4f}")
