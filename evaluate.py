@@ -38,10 +38,10 @@ BATCH_SIZE = 32
 WEIGHTS_PATH = "models/efficientnetb1_finetuned_weights"
 TRAIN_CSV_NAME = "Augmented_Training_labels.csv"
 CALCULATE_OPTIMAL_THRESHOLD = False  # set True to calculate, False to use fixed
-THRESHOLD = 0.3  # fixed threshold if CALCULATE_OPTIMAL_THRESHOLD is False
+THRESHOLD = 0.45  # fixed threshold if CALCULATE_OPTIMAL_THRESHOLD is False
 
 # === Data Load ===
-_, val_gen, test_gen = get_generators(TRAIN_CSV_NAME, IMG_SIZE, BATCH_SIZE)
+_, _, _, _, val_gen, test_gen = get_generators(IMG_SIZE, BATCH_SIZE)
 
 # === Build Model ===
 print("[INFO] Building model architecture...")
