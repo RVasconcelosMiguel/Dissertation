@@ -81,7 +81,7 @@ BATCH_SIZE = 32
 EPOCHS = 100
 LR = 1e-4
 UNFREEZE_FROM_LAYER = 150
-THRESHOLD = 0.45
+THRESHOLD = 0.5
 CALCULATE_OPTIMAL_THRESHOLD = False  # if True, calculate from validation set
 
 # === DATA LOADING ===
@@ -123,7 +123,7 @@ model.compile(
 # === TRAINING ===
 print("Training full model with top layers unfrozen...")
 callbacks = [
-    EarlyStopping(monitor="val_auc", mode="max", patience=20, restore_best_weights=True),
+    EarlyStopping(monitor="val_auc", mode="max", patience=100, restore_best_weights=True),
     ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
     ReduceLROnPlateau(monitor="val_auc", mode="max", factor=0.5, patience=7, min_lr=1e-7, verbose=1),
     RecallLogger()
