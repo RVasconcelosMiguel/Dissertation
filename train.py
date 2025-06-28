@@ -13,6 +13,7 @@ from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLRO
 from model import build_model
 from data_loader import get_generators, load_dataframes
 from plot_utils import plot_history
+from losses import focal_loss  # new import
 
 # === PATHS ===
 output_dir = "/home/jtstudents/rmiguel/files_to_transfer"
@@ -78,10 +79,10 @@ def compute_class_weights(df):
 IMG_SIZE = 240
 BATCH_SIZE = 32
 EPOCHS = 100
-LR = 1e-5  # reduced learning rate for fine-tuning
+LR = 1e-5
 UNFREEZE_FROM_LAYER = 100
-DROPOUT = 0.3
-L2_REG = 1e-4
+DROPOUT = 0.5
+L2_REG = 5e-4
 CALCULATE_OPTIMAL_THRESHOLD = True
 THRESHOLD = 0.5  # fallback threshold
 
@@ -116,7 +117,7 @@ metrics = [
 
 model.compile(
     optimizer=Adam(learning_rate=LR),
-    loss="binary_crossentropy",
+    loss=focal_loss(alpha=0.25, gamma=2.0),  # new focal loss
     metrics=metrics
 )
 
@@ -133,8 +134,7 @@ history = model.fit(
     train_gen,
     validation_data=val_gen,
     epochs=EPOCHS,
-    callbacks=callbacks,
-    class_weight=class_weights
+    callbacks=callbacks
 )
 
 save_history(history, "models/history_efficientnetb1_finetuned.pkl")
@@ -149,9 +149,6 @@ y_val_prob = model.predict(val_gen).flatten()
 y_val_true = np.array(val_gen.classes)
 
 if CALCULATE_OPTIMAL_THRESHOLD:
-    # F1-maximising threshold calculation
-    from sklearn.metrics import precision_recall_curve
-
     precision, recall, thresholds = precision_recall_curve(y_val_true, y_val_prob)
     f1 = 2 * (precision * recall) / (precision + recall + 1e-8)
     optimal_idx = np.argmax(f1)

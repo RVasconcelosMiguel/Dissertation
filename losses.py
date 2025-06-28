@@ -1,25 +1,13 @@
+# === losses.py ===
 import tensorflow as tf
+from tensorflow.keras import backend as K
 
-@tf.keras.utils.register_keras_serializable()
-class FocalLoss(tf.keras.losses.Loss):
-    def __init__(self, gamma=2.0, alpha=0.75, **kwargs):
-        super().__init__(**kwargs)
-        self.gamma = float(gamma)
-        self.alpha = float(alpha)
-
-    def call(self, y_true, y_pred):
-        epsilon = tf.keras.backend.epsilon()
-        y_pred = tf.clip_by_value(y_pred, epsilon, 1. - epsilon)
-        pt = tf.where(tf.equal(y_true, 1), y_pred, 1 - y_pred)
-        loss = -self.alpha * tf.pow(1. - pt, self.gamma) * tf.math.log(pt)
-        return tf.reduce_mean(loss)
-
-    def get_config(self):
-        return {
-            "gamma": self.gamma,
-            "alpha": self.alpha,
-        }
-
-    @classmethod
-    def from_config(cls, config):
-        return cls(**config)
+def focal_loss(alpha=0.25, gamma=2.0):
+    def focal_loss_fixed(y_true, y_pred):
+        epsilon = K.epsilon()
+        y_pred = K.clip(y_pred, epsilon, 1. - epsilon)
+        cross_entropy = -y_true * K.log(y_pred) - (1 - y_true) * K.log(1 - y_pred)
+        weight = alpha * K.pow(1 - y_pred, gamma) * y_true + (1 - alpha) * K.pow(y_pred, gamma) * (1 - y_true)
+        loss = weight * cross_entropy
+        return K.mean(loss)
+    return focal_loss_fixed
