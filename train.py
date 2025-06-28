@@ -82,6 +82,8 @@ EPOCHS = 100
 LR = 1e-4
 UNFREEZE_FROM_LAYER = 100
 THRESHOLD = 0.5
+DROPOUT = 0.2
+L2_REG = 1e-5
 CALCULATE_OPTIMAL_THRESHOLD = False  # if True, calculate from validation set
 
 # === DATA LOADING ===
@@ -96,7 +98,7 @@ class_weights = compute_class_weights(train_df)
 print(f"Class weights {class_weights}\n")
 
 # === MODEL CONSTRUCTION ===
-model, base_model = build_model(img_size=IMG_SIZE)
+model, base_model = build_model(img_size=IMG_SIZE, dropout=DROPOUT, l2_lambda=L2_REG)
 model.summary()
 
 # === UNFREEZE TOP LAYERS ===

@@ -45,7 +45,12 @@ _, _, _, _, val_gen, test_gen = get_generators(IMG_SIZE, BATCH_SIZE)
 
 # === Build Model ===
 print("[INFO] Building model architecture...")
-model, _ = build_model(img_size=IMG_SIZE)
+model, _ = build_model(
+    img_size=224,
+    dropout=0.0,     
+    l2_lambda=1e-4   
+)
+
 
 # === Load Weights ===
 print("[INFO] Loading weights from:", WEIGHTS_PATH)
