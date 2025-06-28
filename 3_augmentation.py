@@ -6,28 +6,68 @@ from PIL import Image
 from tqdm import tqdm
 import albumentations as A
 from sklearn.model_selection import train_test_split
+import random
+
+# === Seeding for reproducibility ===
+random.seed(42)
+np.random.seed(42)
 
 # === Paths ===
 original_train_csv_path = "/raid/DATASETS/rmiguel_datasets/ISIC16/CSV/Training_labels.csv"
+original_test_csv_path = "/raid/DATASETS/rmiguel_datasets/ISIC16/CSV/Testing_labels.csv"
+
 preprocessed_train_images_path = "/raid/DATASETS/rmiguel_datasets/ISIC16/Classification/Preprocessed_Training_Data"
+preprocessed_test_images_path = "/raid/DATASETS/rmiguel_datasets/ISIC16/Classification/Preprocessed_Testing_Data"
+
 output_base_path = "/raid/DATASETS/rmiguel_datasets/ISIC16/Classification/Split"
+
 train_folder = os.path.join(output_base_path, "train")
 val_folder = os.path.join(output_base_path, "val")
+test_folder = os.path.join(output_base_path, "test")
 
 # === Safety Check ===
 assert "rmiguel_datasets" in output_base_path, "Unsafe output path. Aborting."
 
 # === Create folders ===
-for folder in [train_folder, val_folder]:
+for folder in [train_folder, val_folder, test_folder]:
     if os.path.exists(folder):
         print(f"[INFO] Deleting existing folder: {folder}")
         shutil.rmtree(folder)
     os.makedirs(folder, exist_ok=True)
 
-# === Load CSV ===
+# === Copy test images ===
+test_images = [f for f in os.listdir(preprocessed_test_images_path) if f.endswith('.jpg') or f.endswith('.png')]
+
+for img_name in tqdm(test_images, desc="Copying test images"):
+    src_path = os.path.join(preprocessed_test_images_path, img_name)
+    dst_path = os.path.join(test_folder, img_name)
+    if not os.path.exists(src_path):
+        print(f"[WARNING] Test image not found: {src_path}")
+        continue
+    shutil.copy2(src_path, dst_path)
+
+# === Process test CSV with safety mapping ===
+test_df = pd.read_csv(original_test_csv_path, header=None, names=["image", "label"])
+test_df['image'] = test_df['image'].astype(str).apply(lambda x: x if x.endswith('.jpg') else x + '.jpg')
+
+# Safe label mapping
+mapping = {'benign': 0, 'malignant': 1}
+test_df['label'] = test_df['label'].map(mapping)
+assert test_df['label'].notnull().all(), "Unexpected labels in test CSV."
+test_df['label'] = test_df['label'].astype(int)
+
+# Save formatted test CSV
+test_df.to_csv(os.path.join(test_folder, "train_labels.csv"), index=False, header=False)
+print("[INFO] Test CSV copied and saved with consistent formatting.")
+
+# === Load training CSV ===
 df = pd.read_csv(original_train_csv_path, header=None, names=["image", "label"])
 df['image'] = df['image'].astype(str).apply(lambda x: x if x.endswith('.jpg') else x + '.jpg')
-df['label'] = df['label'].map({'benign': 0, 'malignant': 1}).astype(int)
+
+# Safe label mapping
+df['label'] = df['label'].map(mapping)
+assert df['label'].notnull().all(), "Unexpected labels in training CSV."
+df['label'] = df['label'].astype(int)
 
 # === Split before augmentation ===
 train_df, val_df = train_test_split(df, stratify=df['label'], test_size=0.15, random_state=42)
@@ -61,6 +101,9 @@ for cls in label_counts.index:
         img_name = row['image']
         src = os.path.join(preprocessed_train_images_path, img_name)
         dst = os.path.join(train_folder, img_name)
+        if not os.path.exists(src):
+            print(f"[WARNING] Training image not found: {src}")
+            continue
         shutil.copy2(src, dst)
         train_aug_rows.append({'image': img_name, 'label': cls})
 
@@ -79,11 +122,15 @@ for cls in label_counts.index:
         img_name = row['image']
         img_path = os.path.join(preprocessed_train_images_path, img_name)
 
+        if not os.path.exists(img_path):
+            print(f"[WARNING] Training image not found for augmentation: {img_path}")
+            continue
+
         try:
             img = Image.open(img_path).convert("RGB")
             img_np = np.array(img)
         except Exception as e:
-            print(f"Error opening {img_path}: {e}")
+            print(f"[ERROR] Opening image {img_path}: {e}")
             continue
 
         reps = augment_times + (1 if idx < remainder else 0)
@@ -104,6 +151,9 @@ for _, row in val_df.iterrows():
     img_name = row['image']
     src = os.path.join(preprocessed_train_images_path, img_name)
     dst = os.path.join(val_folder, img_name)
+    if not os.path.exists(src):
+        print(f"[WARNING] Validation image not found: {src}")
+        continue
     shutil.copy2(src, dst)
     val_rows.append({'image': img_name, 'label': row['label']})
 
