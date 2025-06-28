@@ -44,11 +44,14 @@ test_df = pd.read_csv(original_test_csv_path, header=None, names=["image", "labe
 test_df['image'] = test_df['image'].astype(str).apply(lambda x: x if x.endswith('.jpg') else x + '.jpg')
 
 if test_df['label'].dtype == object:
-    test_df['label'] = test_df['label'].map({'benign': 0, 'malignant': 1}).astype(int)
+    test_df['label'] = test_df['label'].map({'benign': 0, 'malignant': 1})
+
+test_df['label'] = test_df['label'].astype(int)
 
 test_df.to_csv(os.path.join(test_folder, "test_labels.csv"), index=False, header=False)
 
 print("[INFO] Test CSV copied and saved with consistent formatting.")
+
 
 
 # === Training CSV Load ===
