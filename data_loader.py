@@ -2,18 +2,12 @@ import os
 import pandas as pd
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
-def load_dataframes(train_csv_name):
-    """
-    Loads and prepares training, validation, and testing DataFrames
-    from pre-created split CSVs without leakage.
-    """
-    base_path = train_csv_name
-    test_csv_path = "/raid/DATASETS/rmiguel_datasets/ISIC16/CSV/Testing_labels.csv"
+def load_dataframes(base_path):
 
     # Load CSV files
-    df_train = pd.read_csv(os.path.join(base_path, "train_labels.csv"), header=None, names=['image', 'label'])
-    df_val = pd.read_csv(os.path.join(base_path, "val_labels.csv"), header=None, names=['image', 'label'])
-    df_test = pd.read_csv(test_csv_path, header=None, names=['image', 'label'])
+    df_train = pd.read_csv(os.path.join(base_path, "train/train_labels.csv"), header=None, names=['image', 'label'])
+    df_val = pd.read_csv(os.path.join(base_path, "val/val_labels.csv"), header=None, names=['image', 'label'])
+    df_test = pd.read_csv(os.path.join(base_path, "test/val_labels.csv"), header=None, names=['image', 'label'])
 
     # Convert labels to string format '0' and '1'
     df_train['label'] = df_train['label'].astype(str)

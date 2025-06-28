@@ -15,7 +15,6 @@ output_folders = {
 }
 
 # === Preprocessing Steps ===
-
 def apply_clahe_rgb(image):
     lab = cv2.cvtColor(image, cv2.COLOR_RGB2LAB)
     l, a, b = cv2.split(lab)

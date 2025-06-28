@@ -8,14 +8,14 @@ import albumentations as A
 from sklearn.model_selection import train_test_split
 
 # === Paths ===
-csv_path = "/raid/DATASETS/rmiguel_datasets/ISIC16/CSV/Training_labels.csv"
-preprocessed_folder = "/raid/DATASETS/rmiguel_datasets/ISIC16/Classification/Preprocessed_Training_Data"
-split_base = "/raid/DATASETS/rmiguel_datasets/ISIC16/Classification/Split"
-train_folder = os.path.join(split_base, "train")
-val_folder = os.path.join(split_base, "val")
+original_train_csv_path = "/raid/DATASETS/rmiguel_datasets/ISIC16/CSV/Training_labels.csv"
+preprocessed_train_images_path = "/raid/DATASETS/rmiguel_datasets/ISIC16/Classification/Preprocessed_Training_Data"
+output_base_path = "/raid/DATASETS/rmiguel_datasets/ISIC16/Classification/Split"
+train_folder = os.path.join(output_base_path, "train")
+val_folder = os.path.join(output_base_path, "val")
 
 # === Safety Check ===
-assert "rmiguel_datasets" in split_base, "Unsafe output path. Aborting."
+assert "rmiguel_datasets" in output_base_path, "Unsafe output path. Aborting."
 
 # === Create folders ===
 for folder in [train_folder, val_folder]:
@@ -25,7 +25,7 @@ for folder in [train_folder, val_folder]:
     os.makedirs(folder, exist_ok=True)
 
 # === Load CSV ===
-df = pd.read_csv(csv_path, header=None, names=["image", "label"])
+df = pd.read_csv(original_train_csv_path, header=None, names=["image", "label"])
 df['image'] = df['image'].astype(str).apply(lambda x: x if x.endswith('.jpg') else x + '.jpg')
 df['label'] = df['label'].map({'benign': 0, 'malignant': 1}).astype(int)
 
@@ -45,7 +45,7 @@ augment = A.Compose([
 ])
 
 # === Augment training set to balance classes ===
-target_count = 1500
+target_count = 1250
 train_aug_rows = []
 
 label_counts = train_df['label'].value_counts()
@@ -59,7 +59,7 @@ for cls in label_counts.index:
     # Copy originals
     for _, row in samples.iterrows():
         img_name = row['image']
-        src = os.path.join(preprocessed_folder, img_name)
+        src = os.path.join(preprocessed_train_images_path, img_name)
         dst = os.path.join(train_folder, img_name)
         shutil.copy2(src, dst)
         train_aug_rows.append({'image': img_name, 'label': cls})
@@ -77,7 +77,7 @@ for cls in label_counts.index:
 
     for idx, (_, row) in enumerate(tqdm(samples.iterrows(), total=current_count, desc=f"Augmenting class {cls}")):
         img_name = row['image']
-        img_path = os.path.join(preprocessed_folder, img_name)
+        img_path = os.path.join(preprocessed_train_images_path, img_name)
 
         try:
             img = Image.open(img_path).convert("RGB")
@@ -102,14 +102,14 @@ val_rows = []
 
 for _, row in val_df.iterrows():
     img_name = row['image']
-    src = os.path.join(preprocessed_folder, img_name)
+    src = os.path.join(preprocessed_train_images_path, img_name)
     dst = os.path.join(val_folder, img_name)
     shutil.copy2(src, dst)
     val_rows.append({'image': img_name, 'label': row['label']})
 
 # === Save CSVs ===
-pd.DataFrame(train_aug_rows).to_csv(os.path.join(split_base, "train/train_labels.csv"), index=False, header=False)
-pd.DataFrame(val_rows).to_csv(os.path.join(split_base, "val/val_labels.csv"), index=False, header=False)
+pd.DataFrame(train_aug_rows).to_csv(os.path.join(output_base_path, "train/train_labels.csv"), index=False, header=False)
+pd.DataFrame(val_rows).to_csv(os.path.join(output_base_path, "val/val_labels.csv"), index=False, header=False)
 
 print(f"\n[INFO] Final TRAIN images: {len(train_aug_rows)}")
 print(f"[INFO] Final VAL images: {len(val_rows)}")
