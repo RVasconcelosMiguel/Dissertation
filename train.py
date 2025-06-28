@@ -14,12 +14,17 @@ from model import build_model
 from data_loader import get_generators, load_dataframes
 from plot_utils import plot_history
 
+# === PATHS ===
+output_dir = "/home/jtstudents/rmiguel/files_to_transfer"
+MODEL_PATH = "models/efficientnetb1_finetuned_weights"
+
+
 # === ENVIRONMENT SETUP ===
 start_time = time.time()
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-output_dir = "/home/jtstudents/rmiguel/files_to_transfer"
+
 os.makedirs("models", exist_ok=True)
 os.makedirs(output_dir, exist_ok=True)
 
@@ -76,17 +81,19 @@ BATCH_SIZE = 32
 EPOCHS = 100
 LR = 1e-4
 UNFREEZE_FROM_LAYER = 150
-MODEL_PATH = "models/efficientnetb1_finetuned_weights"
-
-THRESHOLD = 0.3  # set default threshold
+THRESHOLD = 0.45
 CALCULATE_OPTIMAL_THRESHOLD = False  # if True, calculate from validation set
 
 # === DATA LOADING ===
-train_df, val_df, _ = load_dataframes("/raid/DATASETS/rmiguel_datasets/ISIC16/Classification/Split")
+train_df, val_df, test_df, train_gen, val_gen, test_gen = get_generators(IMG_SIZE, BATCH_SIZE)
+
 print_distribution("Train", train_df)
 print_distribution("Validation", val_df)
-train_gen, val_gen, test_gen = get_generators(None, IMG_SIZE, BATCH_SIZE)
+print_distribution("Test", test_df)
+
 class_weights = compute_class_weights(train_df)
+
+print(f"Class weights {class_weights}\n")
 
 # === MODEL CONSTRUCTION ===
 model, base_model = build_model(img_size=IMG_SIZE)

@@ -62,4 +62,4 @@ def get_generators(img_size, batch_size):
         shuffle=False
     )
 
-    return train_gen, val_gen, test_gen
+    return train_df, val_df, test_df, train_gen, val_gen, test_gen
