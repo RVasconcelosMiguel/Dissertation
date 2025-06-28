@@ -51,7 +51,6 @@ model, _ = build_model(
     l2_lambda=1e-4   
 )
 
-
 # === Load Weights ===
 print("[INFO] Loading weights from:", WEIGHTS_PATH)
 if not os.path.exists(WEIGHTS_PATH + ".index"):
@@ -65,17 +64,19 @@ model.compile(
     metrics=["accuracy"]
 )
 
+# === Calculate ROC Curve from Validation Set ===
+print("[INFO] Calculating ROC curve from validation set...")
+y_val_prob = model.predict(val_gen).flatten()
+y_val_true = np.array(val_gen.classes)
+
+fpr, tpr, thresholds = roc_curve(y_val_true, y_val_prob)
+roc_auc = roc_auc_score(y_val_true, y_val_prob)
+
 # === Determine Threshold ===
 if CALCULATE_OPTIMAL_THRESHOLD:
-    print("[INFO] Calculating optimal threshold from validation set...")
-    y_val_prob = model.predict(val_gen).flatten()
-    y_val_true = np.array(val_gen.classes)
-
-    fpr, tpr, thresholds = roc_curve(y_val_true, y_val_prob)
     youden_index = tpr - fpr
     optimal_idx = np.argmax(youden_index)
     optimal_threshold = thresholds[optimal_idx]
-    roc_auc = roc_auc_score(y_val_true, y_val_prob)
 
     if not np.isfinite(optimal_threshold):
         print("[WARNING] Invalid threshold detected; defaulting to 0.5")
@@ -87,6 +88,20 @@ if CALCULATE_OPTIMAL_THRESHOLD:
 else:
     optimal_threshold = THRESHOLD
     print(f"[INFO] Using fixed threshold: {optimal_threshold:.4f}")
+    print(f"[INFO] Validation ROC AUC (for reference): {roc_auc:.4f}")
+
+# === Save ROC Curve ===
+plt.figure()
+plt.plot(fpr, tpr, label=f"AUC = {roc_auc:.4f}")
+if CALCULATE_OPTIMAL_THRESHOLD:
+    plt.scatter(fpr[optimal_idx], tpr[optimal_idx], color='red', label=f"Threshold = {optimal_threshold:.4f}")
+plt.plot([0, 1], [0, 1], 'k--')
+plt.xlabel("FPR")
+plt.ylabel("TPR")
+plt.title("ROC Curve (Validation Set)")
+plt.legend()
+plt.savefig(os.path.join(output_dir, "roc_curve_val_based.png"))
+plt.close()
 
 # === Compile with Thresholded Metrics ===
 thresholded_metrics = [
@@ -122,24 +137,10 @@ print(report)
 # === Save Confusion Matrix ===
 save_confusion_matrix(y_true, y_pred, labels, os.path.join(output_dir, "confusion_matrix_tuned.png"))
 
-# === Optionally Save ROC Curve if calculated ===
-if CALCULATE_OPTIMAL_THRESHOLD:
-    plt.figure()
-    plt.plot(fpr, tpr, label=f"AUC = {roc_auc:.4f}")
-    plt.scatter(fpr[optimal_idx], tpr[optimal_idx], color='red', label=f"Threshold = {optimal_threshold:.4f}")
-    plt.plot([0, 1], [0, 1], 'k--')
-    plt.xlabel("FPR")
-    plt.ylabel("TPR")
-    plt.title("ROC Curve (Validation Set)")
-    plt.legend()
-    plt.savefig(os.path.join(output_dir, "roc_curve_val_based.png"))
-    plt.close()
-
 # === Save Report ===
 with open(os.path.join(output_dir, "evaluation_report.txt"), "w") as f:
     f.write(f"Threshold used: {optimal_threshold:.4f}\n")
-    if CALCULATE_OPTIMAL_THRESHOLD:
-        f.write(f"Validation ROC AUC: {roc_auc:.4f}\n")
+    f.write(f"Validation ROC AUC: {roc_auc:.4f}\n")
     f.write("\n" + report)
 
 end_time = datetime.now()
