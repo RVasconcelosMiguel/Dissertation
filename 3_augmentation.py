@@ -46,7 +46,7 @@ test_df['image'] = test_df['image'].astype(str).apply(lambda x: x if x.endswith(
 if test_df['label'].dtype == object:
     test_df['label'] = test_df['label'].map({'benign': 0, 'malignant': 1}).astype(int)
 
-test_df.to_csv(os.path.join(test_folder, "train_labels.csv"), index=False, header=False)
+test_df.to_csv(os.path.join(test_folder, "test_labels.csv"), index=False, header=False)
 
 print("[INFO] Test CSV copied and saved with consistent formatting.")
 
