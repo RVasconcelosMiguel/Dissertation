@@ -18,7 +18,6 @@ from plot_utils import plot_history
 output_dir = "/home/jtstudents/rmiguel/files_to_transfer"
 MODEL_PATH = "models/efficientnetb1_finetuned_weights"
 
-
 # === ENVIRONMENT SETUP ===
 start_time = time.time()
 
@@ -76,15 +75,15 @@ def compute_class_weights(df):
     }
 
 # === CONFIGURATION ===
-IMG_SIZE = 224
+IMG_SIZE = 240
 BATCH_SIZE = 32
 EPOCHS = 100
 LR = 1e-4
 UNFREEZE_FROM_LAYER = 100
-THRESHOLD = 0.5
 DROPOUT = 0.2
-L2_REG = 1e-5
-CALCULATE_OPTIMAL_THRESHOLD = False  # if True, calculate from validation set
+L2_REG = 0
+CALCULATE_OPTIMAL_THRESHOLD = True  # now set to True for this run
+THRESHOLD = 0.5  # fallback threshold if CALCULATE_OPTIMAL_THRESHOLD is False
 
 # === DATA LOADING ===
 train_df, val_df, test_df, train_gen, val_gen, test_gen = get_generators(IMG_SIZE, BATCH_SIZE)
@@ -108,7 +107,7 @@ for layer in base_model.layers[UNFREEZE_FROM_LAYER:]:
     if not isinstance(layer, tf.keras.layers.BatchNormalization):
         layer.trainable = True
 
-# === COMPILE MODEL ===
+# === INITIAL COMPILE ===
 metrics = [
     tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
     tf.keras.metrics.AUC(name="auc"),
@@ -154,16 +153,23 @@ if CALCULATE_OPTIMAL_THRESHOLD:
     fpr, tpr, thresholds = roc_curve(y_val_true, y_val_prob)
     youden_index = tpr - fpr
     optimal_idx = np.argmax(youden_index)
-    THRESHOLD = thresholds[optimal_idx]
-    if not np.isfinite(THRESHOLD):
-        print("[WARNING] Invalid threshold detected; defaulting to 0.5")
-        THRESHOLD = 0.5
-    print(f"[INFO] Using optimal validation threshold: {THRESHOLD:.4f}")
-else:
-    print(f"[INFO] Using fixed configured threshold : {THRESHOLD:.4f}")
+    optimal_threshold = thresholds[optimal_idx]
 
-with open(os.path.join(output_dir, "optimal_threshold_val.txt"), "w") as f:
-    f.write(f"Threshold used: {THRESHOLD:.4f}\n")
+    if not np.isfinite(optimal_threshold):
+        print("[WARNING] Invalid threshold detected; defaulting to 0.5")
+        optimal_threshold = 0.5
+
+    print(f"[INFO] Using optimal validation threshold: {optimal_threshold:.4f}")
+else:
+    optimal_threshold = THRESHOLD
+    print(f"[INFO] Using fixed configured threshold: {optimal_threshold:.4f}")
+
+# === SAVE THRESHOLD ===
+threshold_path = os.path.join(output_dir, "optimal_threshold_val.txt")
+with open(threshold_path, "w") as f:
+    f.write(f"{optimal_threshold:.4f}\n")
+
+print(f"[INFO] Threshold saved to: {threshold_path}")
 
 # === TRAINING TIME ===
 elapsed_time = time.time() - start_time

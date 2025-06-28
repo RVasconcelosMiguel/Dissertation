@@ -71,7 +71,7 @@ augment = A.Compose([
     A.Rotate(limit=15, p=0.5),
     A.ElasticTransform(alpha=0.5, sigma=20, p=0.1),
     A.ISONoise(color_shift=(0.01, 0.01), intensity=(0.01, 0.03), p=0.1),
-    A.Resize(224, 224)
+    #A.Resize(224, 224)
 ])
 
 # === Augment training set to balance classes ===
