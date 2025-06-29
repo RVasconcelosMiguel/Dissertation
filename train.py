@@ -17,16 +17,16 @@ from plot_utils import plot_history
 #from losses import focal_loss  # keep commented if not used now
 
 # === CONFIGURATION ===
-model_name = "efficientnetb0"  # or "efficientnetb1"
+model_name = "efficientnetb0"
 IMG_SIZE = 224
 BATCH_SIZE = 32
 EPOCHS = 100
-LR = 1e-5
-UNFREEZE_FROM_LAYER = 100
+LR = 1e-4  # test faster learning
+UNFREEZE_FROM_LAYER = 237  # full fine-tuning for comparison
 DROPOUT = 0.5
-L2_REG = 5e-4
+L2_REG = 1e-4  # reduce to avoid underfitting
 CALCULATE_OPTIMAL_THRESHOLD = True
-THRESHOLD = 0.5  # fallback threshold
+THRESHOLD = 0.5
 
 # === PATHS ===
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}"
