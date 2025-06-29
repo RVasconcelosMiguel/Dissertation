@@ -73,7 +73,7 @@ augment = A.Compose([
     A.Rotate(limit=45, p=0.5),
     A.ElasticTransform(alpha=0.5, sigma=20, p=0.1),
     A.ISONoise(color_shift=(0.01, 0.01), intensity=(0.01, 0.03), p=0.1),
-    A.RandomResizedCrop(height=IMG_SIZE, width=IMG_SIZE, scale=(0.8, 1.0), ratio=(0.75, 1.33), p=0.5),
+    A.RandomResizedCrop(size=(IMG_SIZE, IMG_SIZE), scale=(0.8, 1.0), ratio=(0.75, 1.33), p=0.5)
 ])
 
 
