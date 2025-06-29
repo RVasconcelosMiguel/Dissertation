@@ -7,6 +7,8 @@ from tqdm import tqdm
 import albumentations as A
 from sklearn.model_selection import train_test_split
 
+IMG_SIZE=260
+
 # === Paths ===
 original_train_csv_path = "/raid/DATASETS/rmiguel_datasets/ISIC16/CSV/Training_labels.csv"
 original_test_csv_path = "/raid/DATASETS/rmiguel_datasets/ISIC16/CSV/Testing_labels.csv"
@@ -66,13 +68,16 @@ train_df, val_df = train_test_split(df, stratify=df['label'], test_size=0.30, ra
 augment = A.Compose([
     A.HorizontalFlip(p=0.5),
     A.VerticalFlip(p=0.5),
+    A.RandomResizedCrop(height=IMG_SIZE, width=IMG_SIZE, scale=(0.8, 1.0), p=0.5),
+    A.Rotate(limit=45, p=0.5),
+    A.ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.1, rotate_limit=0, p=0.3),
     A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.5),
     A.HueSaturationValue(hue_shift_limit=5, sat_shift_limit=10, val_shift_limit=10, p=0.3),
-    A.Rotate(limit=45, p=0.5),
     A.ElasticTransform(alpha=0.5, sigma=20, p=0.1),
     A.ISONoise(color_shift=(0.01, 0.01), intensity=(0.01, 0.03), p=0.1),
-    #A.Resize(224, 224)
+    A.CoarseDropout(max_holes=8, max_height=16, max_width=16, p=0.3),
 ])
+
 
 # === Augment training set to balance classes ===
 target_count = 5000
