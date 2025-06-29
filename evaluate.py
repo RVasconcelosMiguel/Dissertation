@@ -7,7 +7,7 @@ from datetime import datetime
 
 # === CONFIGURATION ===
 model_name = "efficientnetb0"  # or "efficientnetb1"
-IMG_SIZE = 240
+IMG_SIZE = 224
 BATCH_SIZE = 32
 
 # === Paths ===
