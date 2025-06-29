@@ -5,16 +5,26 @@ import logging
 import warnings
 from datetime import datetime
 
+# === CONFIGURATION ===
+model_name = "efficientnetb0"  # or "efficientnetb1"
+IMG_SIZE = 240
+BATCH_SIZE = 32
+
+# === Paths ===
+output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}"
+os.makedirs(output_dir, exist_ok=True)
+
+WEIGHTS_PATH = f"models/{model_name}_finetuned_weights"
+threshold_path = os.path.join(output_dir, "optimal_threshold_val.txt")
+log_file_path = os.path.join(output_dir, "evaluate_log.txt")
+
 # === Silence TensorFlow logging and warnings ===
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 logging.getLogger('tensorflow').setLevel(logging.ERROR)
 warnings.filterwarnings("ignore", category=FutureWarning)
 
-# === Output Setup ===
-output_dir = "/home/jtstudents/rmiguel/files_to_transfer"
-os.makedirs(output_dir, exist_ok=True)
-log_file_path = os.path.join(output_dir, "evaluate_log.txt")
+# === Redirect stdout and stderr ===
 log_file = open(log_file_path, "w")
 sys.stdout = log_file
 sys.stderr = log_file
@@ -32,24 +42,18 @@ from model import build_model
 from data_loader import get_generators
 from plot_utils import save_confusion_matrix
 
-# === CONFIGURATION ===
-IMG_SIZE = 240
-BATCH_SIZE = 32
-WEIGHTS_PATH = "models/efficientnetb1_finetuned_weights"
-
 # === Load saved optimal threshold from train.py ===
-threshold_path = os.path.join(output_dir, "optimal_threshold_val.txt")
 with open(threshold_path, "r") as f:
     optimal_threshold = float(f.read().strip())
-
 print(f"[INFO] Loaded optimal threshold from training: {optimal_threshold:.4f}")
 
 # === Data Load ===
 _, _, _, _, val_gen, test_gen = get_generators(IMG_SIZE, BATCH_SIZE)
 
 # === Build Model ===
-print("[INFO] Building model architecture...")
+print(f"[INFO] Building model architecture: {model_name}...")
 model, _ = build_model(
+    model_name=model_name,
     img_size=IMG_SIZE,
     dropout=0.0,
     l2_lambda=1e-4
@@ -123,6 +127,7 @@ duration = end_time - start_time
 print(f"[INFO] Evaluation completed at: {end_time.isoformat()}")
 print(f"[INFO] Total evaluation time: {duration}")
 
+# === Close logging ===
 sys.stdout = sys.__stdout__
 sys.stderr = sys.__stderr__
 log_file.close()

@@ -14,11 +14,25 @@ from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLRO
 from model import build_model
 from data_loader import get_generators, load_dataframes
 from plot_utils import plot_history
-from losses import focal_loss  # new import
+#from losses import focal_loss  # keep commented if not used now
+
+# === CONFIGURATION ===
+model_name = "efficientnetb0"  # or "efficientnetb1"
+IMG_SIZE = 240
+BATCH_SIZE = 32
+EPOCHS = 100
+LR = 1e-5
+UNFREEZE_FROM_LAYER = 100
+DROPOUT = 0.5
+L2_REG = 5e-4
+CALCULATE_OPTIMAL_THRESHOLD = True
+THRESHOLD = 0.5  # fallback threshold
 
 # === PATHS ===
-output_dir = "/home/jtstudents/rmiguel/files_to_transfer"
-MODEL_PATH = "models/efficientnetb1_finetuned_weights"
+output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}"
+os.makedirs(output_dir, exist_ok=True)
+
+MODEL_PATH = f"models/{model_name}_finetuned_weights"
 
 # === ENVIRONMENT SETUP ===
 start_time = time.time()
@@ -27,7 +41,6 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 os.makedirs("models", exist_ok=True)
-os.makedirs(output_dir, exist_ok=True)
 
 log_path = os.path.join(output_dir, "train_log.txt")
 log_file = open(log_path, "w")
@@ -72,18 +85,6 @@ def compute_class_weights(df):
     weights = compute_class_weight('balanced', classes=classes, y=labels)
     return dict(zip(classes, weights))
 
-
-# === CONFIGURATION ===
-IMG_SIZE = 240
-BATCH_SIZE = 32
-EPOCHS = 100
-LR = 1e-5
-UNFREEZE_FROM_LAYER = 100
-DROPOUT = 0.5
-L2_REG = 5e-4
-CALCULATE_OPTIMAL_THRESHOLD = True
-THRESHOLD = 0.5  # fallback threshold
-
 # === DATA LOADING ===
 train_df, val_df, test_df, train_gen, val_gen, test_gen = get_generators(IMG_SIZE, BATCH_SIZE)
 
@@ -95,7 +96,7 @@ class_weights = compute_class_weights(train_df)
 print(f"Class weights {class_weights}\n")
 
 # === MODEL CONSTRUCTION ===
-model, base_model = build_model(img_size=IMG_SIZE, dropout=DROPOUT, l2_lambda=L2_REG)
+model, base_model = build_model(model_name, img_size=IMG_SIZE, dropout=DROPOUT, l2_lambda=L2_REG)
 model.summary()
 
 # === UNFREEZE TOP LAYERS ===
@@ -115,12 +116,12 @@ metrics = [
 
 model.compile(
     optimizer=Adam(learning_rate=LR),
-    loss="binary_crossentropy",  # revert to BCE
+    loss="binary_crossentropy",  # or focal_loss(alpha=0.25, gamma=2.0)
     metrics=metrics
 )
 
 # === TRAINING ===
-print("Training full model with top layers unfrozen...")
+print(f"Training model: {model_name} with top layers unfrozen...")
 callbacks = [
     EarlyStopping(monitor="val_auc", mode="max", patience=50, restore_best_weights=True),
     ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
@@ -135,10 +136,10 @@ history = model.fit(
     callbacks=callbacks
 )
 
-save_history(history, "models/history_efficientnetb1_finetuned.pkl")
+save_history(history, f"models/history_{model_name}_finetuned.pkl")
 
 # === PLOTTING ===
-plot_history({"Finetune": history}, output_dir, ["accuracy", "loss", "auc", "recall"])
+plot_history({model_name: history}, output_dir, ["accuracy", "loss", "auc", "recall"])
 
 # === THRESHOLDING ===
 print("[INFO] Calculating or setting threshold...")
