@@ -16,8 +16,8 @@ from data_loader import get_generators
 from plot_utils import plot_history
 
 # === CONFIGURATION ===
-model_name = "efficientnetb0"
-IMG_SIZE = 224
+model_name = "efficientnetb2"
+IMG_SIZE = 260
 BATCH_SIZE = 32
 
 # Two-stage training hyperparameters
