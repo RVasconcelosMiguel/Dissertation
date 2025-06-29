@@ -68,19 +68,17 @@ train_df, val_df = train_test_split(df, stratify=df['label'], test_size=0.30, ra
 augment = A.Compose([
     A.HorizontalFlip(p=0.5),
     A.VerticalFlip(p=0.5),
-    A.RandomResizedCrop(height=IMG_SIZE, width=IMG_SIZE, scale=(0.8, 1.0), p=0.5),
-    A.Rotate(limit=45, p=0.5),
-    A.ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.1, rotate_limit=0, p=0.3),
     A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.5),
     A.HueSaturationValue(hue_shift_limit=5, sat_shift_limit=10, val_shift_limit=10, p=0.3),
+    A.Rotate(limit=45, p=0.5),
     A.ElasticTransform(alpha=0.5, sigma=20, p=0.1),
     A.ISONoise(color_shift=(0.01, 0.01), intensity=(0.01, 0.03), p=0.1),
-    A.CoarseDropout(max_holes=8, max_height=16, max_width=16, p=0.3),
+    A.RandomResizedCrop(height=IMG_SIZE, width=IMG_SIZE, scale=(0.8, 1.0), ratio=(0.75, 1.33), p=0.5),
 ])
 
 
 # === Augment training set to balance classes ===
-target_count = 5000
+target_count = 2000
 train_aug_rows = []
 
 label_counts = train_df['label'].value_counts()
