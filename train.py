@@ -12,19 +12,20 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau, Callback
 
 from model import build_model
-from data_loader import get_generators, load_dataframes
+from data_loader import get_generators
 from plot_utils import plot_history
-#from losses import focal_loss  # keep commented if not used now
 
 # === CONFIGURATION ===
 model_name = "efficientnetb0"
 IMG_SIZE = 224
 BATCH_SIZE = 32
-EPOCHS = 100
-LR = 1e-4  # test faster learning
-UNFREEZE_FROM_LAYER = 237  # full fine-tuning for comparison
-DROPOUT = 0.5
-L2_REG = 1e-4  # reduce to avoid underfitting
+EPOCHS_STAGE1 = 10     # warmup epochs with frozen base
+EPOCHS_STAGE2 = 100    # fine-tuning epochs
+LR_STAGE1 = 1e-3       # higher LR for dense layers
+LR_STAGE2 = 1e-5       # lower LR for fine-tuning
+UNFREEZE_FROM_LAYER = 100
+DROPOUT = 0.2
+L2_REG = 1e-4
 CALCULATE_OPTIMAL_THRESHOLD = True
 THRESHOLD = 0.5
 
@@ -99,29 +100,50 @@ print(f"Class weights {class_weights}\n")
 model, base_model = build_model(model_name, img_size=IMG_SIZE, dropout=DROPOUT, l2_lambda=L2_REG)
 model.summary()
 
-# === UNFREEZE TOP LAYERS ===
+# === STAGE 1: Train dense layers only ===
+for layer in base_model.layers:
+    layer.trainable = False
+
+print("\n[INFO] Stage 1: Training dense layers only with frozen base model...\n")
+
+model.compile(
+    optimizer=Adam(learning_rate=LR_STAGE1),
+    loss="binary_crossentropy",
+    metrics=[
+        tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
+        tf.keras.metrics.AUC(name="auc"),
+        tf.keras.metrics.Precision(name="precision", thresholds=THRESHOLD),
+        tf.keras.metrics.Recall(name="recall", thresholds=THRESHOLD),
+    ]
+)
+
+history_stage1 = model.fit(
+    train_gen,
+    validation_data=val_gen,
+    epochs=EPOCHS_STAGE1,
+    callbacks=[RecallLogger()]
+)
+
+# === STAGE 2: Fine-tuning with unfrozen top layers ===
 for layer in base_model.layers[:UNFREEZE_FROM_LAYER]:
     layer.trainable = False
 for layer in base_model.layers[UNFREEZE_FROM_LAYER:]:
     if not isinstance(layer, tf.keras.layers.BatchNormalization):
         layer.trainable = True
 
-# === INITIAL COMPILE ===
-metrics = [
-    tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
-    tf.keras.metrics.AUC(name="auc"),
-    tf.keras.metrics.Precision(name="precision", thresholds=THRESHOLD),
-    tf.keras.metrics.Recall(name="recall", thresholds=THRESHOLD),
-]
+print("\n[INFO] Stage 2: Fine-tuning top layers...\n")
 
 model.compile(
-    optimizer=Adam(learning_rate=LR),
-    loss="binary_crossentropy",  # or focal_loss(alpha=0.25, gamma=2.0)
-    metrics=metrics
+    optimizer=Adam(learning_rate=LR_STAGE2),
+    loss="binary_crossentropy",
+    metrics=[
+        tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
+        tf.keras.metrics.AUC(name="auc"),
+        tf.keras.metrics.Precision(name="precision", thresholds=THRESHOLD),
+        tf.keras.metrics.Recall(name="recall", thresholds=THRESHOLD),
+    ]
 )
 
-# === TRAINING ===
-print(f"Training model: {model_name} with top layers unfrozen...")
 callbacks = [
     EarlyStopping(monitor="val_auc", mode="max", patience=50, restore_best_weights=True),
     ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
@@ -129,17 +151,19 @@ callbacks = [
     RecallLogger()
 ]
 
-history = model.fit(
+history_stage2 = model.fit(
     train_gen,
     validation_data=val_gen,
-    epochs=EPOCHS,
+    epochs=EPOCHS_STAGE2,
     callbacks=callbacks
 )
 
-save_history(history, f"models/history_{model_name}_finetuned.pkl")
+# === SAVE HISTORY ===
+save_history(history_stage1, f"models/history_{model_name}_stage1.pkl")
+save_history(history_stage2, f"models/history_{model_name}_stage2.pkl")
 
 # === PLOTTING ===
-plot_history({model_name: history}, output_dir, ["accuracy", "loss", "auc", "recall"])
+plot_history({f"{model_name}_stage1": history_stage1, f"{model_name}_stage2": history_stage2}, output_dir, ["accuracy", "loss", "auc", "recall"])
 
 # === THRESHOLDING ===
 print("[INFO] Calculating or setting threshold...")
