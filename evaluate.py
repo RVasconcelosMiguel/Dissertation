@@ -6,7 +6,7 @@ import warnings
 from datetime import datetime
 
 # === CONFIGURATION ===
-model_name = "efficientnetb0"  # or "efficientnetb1"
+model_name = "efficientnetb0"  # options: "efficientnetb0", "efficientnetb1", "efficientnetb2"
 IMG_SIZE = 224
 BATCH_SIZE = 32
 
@@ -60,7 +60,7 @@ model, _ = build_model(
 )
 
 # === Load Weights ===
-print("[INFO] Loading weights from:", WEIGHTS_PATH)
+print(f"[INFO] Loading weights from: {WEIGHTS_PATH}")
 if not os.path.exists(WEIGHTS_PATH + ".index"):
     raise FileNotFoundError(f"Missing weights: {WEIGHTS_PATH}.index")
 model.load_weights(WEIGHTS_PATH)
@@ -99,7 +99,7 @@ plt.plot(fpr, tpr, label=f"AUC = {roc_auc:.4f}")
 plt.plot([0, 1], [0, 1], 'k--')
 plt.xlabel("FPR")
 plt.ylabel("TPR")
-plt.title("ROC Curve (Test Set)")
+plt.title(f"ROC Curve (Test Set) - {model_name}")
 plt.legend()
 plt.savefig(os.path.join(output_dir, "roc_curve_test.png"))
 plt.close()
@@ -118,9 +118,10 @@ save_confusion_matrix(y_true, y_pred, labels, os.path.join(output_dir, "confusio
 
 # === Save Report ===
 with open(os.path.join(output_dir, "evaluation_report.txt"), "w") as f:
+    f.write(f"Model evaluated: {model_name}\n")
     f.write(f"Threshold used: {optimal_threshold:.4f}\n")
-    f.write(f"Test ROC AUC: {roc_auc:.4f}\n")
-    f.write("\n" + report)
+    f.write(f"Test ROC AUC: {roc_auc:.4f}\n\n")
+    f.write(report)
 
 end_time = datetime.now()
 duration = end_time - start_time

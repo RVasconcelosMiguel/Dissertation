@@ -19,11 +19,14 @@ from plot_utils import plot_history
 model_name = "efficientnetb0"
 IMG_SIZE = 224
 BATCH_SIZE = 32
-EPOCHS_STAGE1 = 10     # warmup epochs with frozen base
-EPOCHS_STAGE2 = 100    # fine-tuning epochs
-LR_STAGE1 = 1e-3       # higher LR for dense layers
-LR_STAGE2 = 1e-5       # lower LR for fine-tuning
+
+# Two-stage training hyperparameters
+EPOCHS_STAGE1 = 10    # dense head training
+EPOCHS_STAGE2 = 100   # fine-tuning entire model
+LR_STAGE1 = 1e-3
+LR_STAGE2 = 1e-5
 UNFREEZE_FROM_LAYER = 100
+
 DROPOUT = 0.2
 L2_REG = 1e-4
 CALCULATE_OPTIMAL_THRESHOLD = True
@@ -32,12 +35,10 @@ THRESHOLD = 0.5
 # === PATHS ===
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}"
 os.makedirs(output_dir, exist_ok=True)
-
 MODEL_PATH = f"models/{model_name}_finetuned_weights"
 
 # === ENVIRONMENT SETUP ===
 start_time = time.time()
-
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
@@ -100,11 +101,11 @@ print(f"Class weights {class_weights}\n")
 model, base_model = build_model(model_name, img_size=IMG_SIZE, dropout=DROPOUT, l2_lambda=L2_REG)
 model.summary()
 
-# === STAGE 1: Train dense layers only ===
+# === STAGE 1: Train head only ===
 for layer in base_model.layers:
     layer.trainable = False
 
-print("\n[INFO] Stage 1: Training dense layers only with frozen base model...\n")
+print("\n[INFO] Stage 1: Training dense head only...\n")
 
 model.compile(
     optimizer=Adam(learning_rate=LR_STAGE1),
@@ -124,14 +125,14 @@ history_stage1 = model.fit(
     callbacks=[RecallLogger()]
 )
 
-# === STAGE 2: Fine-tuning with unfrozen top layers ===
+# === STAGE 2: Fine-tuning ===
 for layer in base_model.layers[:UNFREEZE_FROM_LAYER]:
     layer.trainable = False
 for layer in base_model.layers[UNFREEZE_FROM_LAYER:]:
     if not isinstance(layer, tf.keras.layers.BatchNormalization):
         layer.trainable = True
 
-print("\n[INFO] Stage 2: Fine-tuning top layers...\n")
+print("\n[INFO] Stage 2: Fine-tuning model...\n")
 
 model.compile(
     optimizer=Adam(learning_rate=LR_STAGE2),
@@ -158,7 +159,7 @@ history_stage2 = model.fit(
     callbacks=callbacks
 )
 
-# === SAVE HISTORY ===
+# === SAVE HISTORIES ===
 save_history(history_stage1, f"models/history_{model_name}_stage1.pkl")
 save_history(history_stage2, f"models/history_{model_name}_stage2.pkl")
 
@@ -166,7 +167,7 @@ save_history(history_stage2, f"models/history_{model_name}_stage2.pkl")
 plot_history({f"{model_name}_stage1": history_stage1, f"{model_name}_stage2": history_stage2}, output_dir, ["accuracy", "loss", "auc", "recall"])
 
 # === THRESHOLDING ===
-print("[INFO] Calculating or setting threshold...")
+print("[INFO] Calculating optimal threshold...")
 
 y_val_prob = model.predict(val_gen).flatten()
 y_val_true = np.array(val_gen.classes)
@@ -175,27 +176,19 @@ if CALCULATE_OPTIMAL_THRESHOLD:
     precision, recall, thresholds = precision_recall_curve(y_val_true, y_val_prob)
     f1 = 2 * (precision * recall) / (precision + recall + 1e-8)
     optimal_idx = np.argmax(f1)
-    optimal_threshold = thresholds[optimal_idx]
-
-    if not np.isfinite(optimal_threshold):
-        print("[WARNING] Invalid threshold detected; defaulting to 0.5")
-        optimal_threshold = 0.5
-
+    optimal_threshold = thresholds[optimal_idx] if np.isfinite(thresholds[optimal_idx]) else 0.5
     print(f"[INFO] Using optimal validation threshold (F1-maximised): {optimal_threshold:.4f}")
 else:
     optimal_threshold = THRESHOLD
-    print(f"[INFO] Using fixed configured threshold: {optimal_threshold:.4f}")
+    print(f"[INFO] Using fixed threshold: {optimal_threshold:.4f}")
 
 # === SAVE THRESHOLD ===
 threshold_path = os.path.join(output_dir, "optimal_threshold_val.txt")
 with open(threshold_path, "w") as f:
     f.write(f"{optimal_threshold:.4f}\n")
-
 print(f"[INFO] Threshold saved to: {threshold_path}")
 
 # === TRAINING TIME ===
 elapsed_time = time.time() - start_time
-minutes = int(elapsed_time // 60)
-seconds = int(elapsed_time % 60)
-print(f"[INFO] Total training time: {minutes}m {seconds}s")
+print(f"[INFO] Total training time: {int(elapsed_time // 60)}m {int(elapsed_time % 60)}s")
 log_file.close()
