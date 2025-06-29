@@ -42,12 +42,12 @@ from model import build_model
 from data_loader import get_generators
 from plot_utils import save_confusion_matrix
 
-# === Load saved optimal threshold from train.py ===
+# === Load saved optimal threshold from validation ===
 with open(threshold_path, "r") as f:
     optimal_threshold = float(f.read().strip())
-print(f"[INFO] Loaded optimal threshold from training: {optimal_threshold:.4f}")
+print(f"[INFO] Loaded optimal threshold from training (validation-based): {optimal_threshold:.4f}")
 
-# === Data Load ===
+# === Data Loading ===
 _, _, _, _, val_gen, test_gen = get_generators(IMG_SIZE, BATCH_SIZE)
 
 # === Build Model ===
@@ -59,13 +59,13 @@ model, _ = build_model(
     l2_lambda=1e-4
 )
 
-# === Load Weights ===
+# === Load Trained Weights ===
 print(f"[INFO] Loading weights from: {WEIGHTS_PATH}")
 if not os.path.exists(WEIGHTS_PATH + ".index"):
     raise FileNotFoundError(f"Missing weights: {WEIGHTS_PATH}.index")
 model.load_weights(WEIGHTS_PATH)
 
-# === Compile for Evaluation ===
+# === Compile Model for Evaluation ===
 thresholded_metrics = [
     tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=optimal_threshold),
     tf.keras.metrics.AUC(name="auc"),
@@ -79,13 +79,13 @@ model.compile(
     metrics=thresholded_metrics
 )
 
-# === Evaluate on Test Set ===
-print("[INFO] Evaluating on test set...")
+# === Evaluate on Test Set (applying threshold from validation) ===
+print("[INFO] Evaluating on test set (no further training)...")
 results = model.evaluate(test_gen, verbose=1)
 for name, val in zip(model.metrics_names, results):
     print(f"{name}: {val:.4f}")
 
-# === Generate test set ROC curve ===
+# === Generate ROC Curve for test set ===
 print("[INFO] Generating ROC curve for test set...")
 y_prob = model.predict(test_gen).flatten()
 y_true = np.array(test_gen.classes)
@@ -93,33 +93,32 @@ y_true = np.array(test_gen.classes)
 fpr, tpr, thresholds = roc_curve(y_true, y_prob)
 roc_auc = roc_auc_score(y_true, y_prob)
 
-# === Save ROC Curve ===
 plt.figure()
 plt.plot(fpr, tpr, label=f"AUC = {roc_auc:.4f}")
 plt.plot([0, 1], [0, 1], 'k--')
-plt.xlabel("FPR")
-plt.ylabel("TPR")
+plt.xlabel("False Positive Rate")
+plt.ylabel("True Positive Rate")
 plt.title(f"ROC Curve (Test Set) - {model_name}")
 plt.legend()
 plt.savefig(os.path.join(output_dir, "roc_curve_test.png"))
 plt.close()
 
-# === Threshold-based Predictions ===
-print("[INFO] Generating test predictions with loaded threshold...")
+# === Threshold-based Predictions and Classification Report ===
+print("[INFO] Generating test predictions with loaded threshold (no threshold optimisation on test set)...")
 y_pred = (y_prob >= optimal_threshold).astype(int)
 labels = list(test_gen.class_indices.keys())
 
-print("[INFO] Classification report:")
 report = classification_report(y_true, y_pred, target_names=labels, digits=4)
+print("[INFO] Classification report:")
 print(report)
 
 # === Save Confusion Matrix ===
 save_confusion_matrix(y_true, y_pred, labels, os.path.join(output_dir, "confusion_matrix_tuned.png"))
 
-# === Save Report ===
+# === Save Evaluation Report ===
 with open(os.path.join(output_dir, "evaluation_report.txt"), "w") as f:
     f.write(f"Model evaluated: {model_name}\n")
-    f.write(f"Threshold used: {optimal_threshold:.4f}\n")
+    f.write(f"Threshold used (from validation): {optimal_threshold:.4f}\n")
     f.write(f"Test ROC AUC: {roc_auc:.4f}\n\n")
     f.write(report)
 
@@ -128,7 +127,7 @@ duration = end_time - start_time
 print(f"[INFO] Evaluation completed at: {end_time.isoformat()}")
 print(f"[INFO] Total evaluation time: {duration}")
 
-# === Close logging ===
+# === Close Logging ===
 sys.stdout = sys.__stdout__
 sys.stderr = sys.__stderr__
 log_file.close()

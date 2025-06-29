@@ -4,7 +4,7 @@ import pickle
 import numpy as np
 import tensorflow as tf
 import time
-from sklearn.metrics import precision_recall_curve
+from sklearn.metrics import roc_curve
 from sklearn.utils.class_weight import compute_class_weight
 import matplotlib.pyplot as plt
 
@@ -21,14 +21,14 @@ IMG_SIZE = 260
 BATCH_SIZE = 32
 
 # Two-stage training hyperparameters
-EPOCHS_STAGE1 = 10    # dense head training
-EPOCHS_STAGE2 = 100   # fine-tuning entire model
+EPOCHS_STAGE1 = 30
+EPOCHS_STAGE2 = 100
 LR_STAGE1 = 1e-3
 LR_STAGE2 = 1e-5
-UNFREEZE_FROM_LAYER = 100
+UNFREEZE_FROM_LAYER = 0
 
 DROPOUT = 0.2
-L2_REG = 1e-4
+L2_REG = 5e-4
 CALCULATE_OPTIMAL_THRESHOLD = True
 THRESHOLD = 0.5
 
@@ -166,18 +166,18 @@ save_history(history_stage2, f"models/history_{model_name}_stage2.pkl")
 # === PLOTTING ===
 plot_history({f"{model_name}_stage1": history_stage1, f"{model_name}_stage2": history_stage2}, output_dir, ["accuracy", "loss", "auc", "recall"])
 
-# === THRESHOLDING ===
-print("[INFO] Calculating optimal threshold...")
+# === THRESHOLDING (Youden's J statistic) ===
+print("[INFO] Calculating optimal threshold using Youden's J statistic...")
 
 y_val_prob = model.predict(val_gen).flatten()
 y_val_true = np.array(val_gen.classes)
 
 if CALCULATE_OPTIMAL_THRESHOLD:
-    precision, recall, thresholds = precision_recall_curve(y_val_true, y_val_prob)
-    f1 = 2 * (precision * recall) / (precision + recall + 1e-8)
-    optimal_idx = np.argmax(f1)
+    fpr, tpr, thresholds = roc_curve(y_val_true, y_val_prob)
+    youden_index = tpr - fpr
+    optimal_idx = np.argmax(youden_index)
     optimal_threshold = thresholds[optimal_idx] if np.isfinite(thresholds[optimal_idx]) else 0.5
-    print(f"[INFO] Using optimal validation threshold (F1-maximised): {optimal_threshold:.4f}")
+    print(f"[INFO] Using optimal validation threshold (Youden's J): {optimal_threshold:.4f}")
 else:
     optimal_threshold = THRESHOLD
     print(f"[INFO] Using fixed threshold: {optimal_threshold:.4f}")
