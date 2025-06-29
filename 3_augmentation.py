@@ -68,14 +68,14 @@ augment = A.Compose([
     A.VerticalFlip(p=0.5),
     A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.5),
     A.HueSaturationValue(hue_shift_limit=5, sat_shift_limit=10, val_shift_limit=10, p=0.3),
-    A.Rotate(limit=15, p=0.5),
+    A.Rotate(limit=45, p=0.5),
     A.ElasticTransform(alpha=0.5, sigma=20, p=0.1),
     A.ISONoise(color_shift=(0.01, 0.01), intensity=(0.01, 0.03), p=0.1),
     #A.Resize(224, 224)
 ])
 
 # === Augment training set to balance classes ===
-target_count = 509
+target_count = 5000
 train_aug_rows = []
 
 label_counts = train_df['label'].value_counts()
