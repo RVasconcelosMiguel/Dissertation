@@ -7,7 +7,13 @@ from tqdm import tqdm
 import albumentations as A
 from sklearn.model_selection import train_test_split
 
-IMG_SIZE=260
+IMG_SIZE = 260
+
+# === Define target final number of images per class ===
+TARGET_COUNT_PER_CLASS = {
+    0: 1000,  # class 0 (benign)
+    1: 600    # class 1 (malignant)
+}
 
 # === Paths ===
 original_train_csv_path = "/raid/DATASETS/rmiguel_datasets/ISIC16/CSV/Training_labels.csv"
@@ -54,8 +60,6 @@ test_df.to_csv(os.path.join(test_folder, "test_labels.csv"), index=False, header
 
 print("[INFO] Test CSV copied and saved with consistent formatting.")
 
-
-
 # === Training CSV Load ===
 df = pd.read_csv(original_train_csv_path, header=None, names=["image", "label"])
 df['image'] = df['image'].astype(str).apply(lambda x: x if x.endswith('.jpg') else x + '.jpg')
@@ -73,19 +77,19 @@ augment = A.Compose([
     A.Rotate(limit=45, p=0.5),
     A.ElasticTransform(alpha=0.5, sigma=20, p=0.1),
     A.ISONoise(color_shift=(0.01, 0.01), intensity=(0.01, 0.03), p=0.1),
-    A.RandomResizedCrop(size=(IMG_SIZE, IMG_SIZE), scale=(0.8, 1.0), ratio=(0.75, 1.33), p=0.5)
+    A.RandomResizedCrop(height=IMG_SIZE, width=IMG_SIZE, scale=(0.8, 1.0), ratio=(0.75, 1.33), p=0.5)
 ])
 
-
-# === Augment training set to balance classes ===
-target_count = 2000
+# === Augment training set to reach target per class ===
 train_aug_rows = []
 
 label_counts = train_df['label'].value_counts()
 print("Initial TRAIN class distribution:")
 print(label_counts)
 
-for cls in label_counts.index:
+for cls in TARGET_COUNT_PER_CLASS.keys():
+    target_count = TARGET_COUNT_PER_CLASS[cls]
+
     samples = train_df[train_df['label'] == cls]
     current_count = len(samples)
 
@@ -97,7 +101,6 @@ for cls in label_counts.index:
         shutil.copy2(src, dst)
         train_aug_rows.append({'image': img_name, 'label': cls})
 
-    # Determine augmentations needed
     augment_needed = target_count - current_count
     if augment_needed <= 0:
         print(f"Class {cls} already has {current_count} samples. No augmentation needed.")
@@ -106,7 +109,7 @@ for cls in label_counts.index:
     augment_times = augment_needed // current_count
     remainder = augment_needed % current_count
 
-    print(f"Class {cls}: augmenting {current_count} images to generate {augment_needed} new images.")
+    print(f"Class {cls}: augmenting {current_count} images to generate {augment_needed} new images (target total: {target_count}).")
 
     for idx, (_, row) in enumerate(tqdm(samples.iterrows(), total=current_count, desc=f"Augmenting class {cls}")):
         img_name = row['image']
