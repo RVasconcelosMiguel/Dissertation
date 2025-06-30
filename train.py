@@ -4,6 +4,7 @@ import pickle
 import numpy as np
 import tensorflow as tf
 import time
+from tqdm import tqdm
 from sklearn.metrics import roc_curve
 from sklearn.utils.class_weight import compute_class_weight
 import matplotlib.pyplot as plt
@@ -16,11 +17,10 @@ from data_loader import get_generators
 from plot_utils import plot_history
 
 # === CONFIGURATION ===
-model_name = "custom_cnn"  # Change model here
+model_name = "custom_cnn"
 IMG_SIZE = 224
 BATCH_SIZE = 32
 
-# Two-stage training hyperparameters
 EPOCHS_STAGE1 = 30
 EPOCHS_STAGE2 = 100
 LR_STAGE1 = 1e-3
@@ -46,6 +46,8 @@ os.makedirs("models", exist_ok=True)
 
 log_path = os.path.join(output_dir, "train_log.txt")
 log_file = open(log_path, "w")
+
+# === Redirect TensorFlow outputs to log only ===
 sys.stdout = log_file
 sys.stderr = log_file
 
@@ -101,32 +103,39 @@ print(f"Class weights {class_weights}\n")
 model, base_model = build_model(model_name, img_size=IMG_SIZE, dropout=DROPOUT, l2_lambda=L2_REG)
 model.summary()
 
+# === TRAINING FUNCTION WITH TQDM PROGRESS BAR ===
+def train_with_progress_bar(generator, val_generator, epochs, stage_name, learning_rate):
+    model.compile(
+        optimizer=Adam(learning_rate=learning_rate),
+        loss="binary_crossentropy",
+        metrics=[
+            tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
+            tf.keras.metrics.AUC(name="auc"),
+            tf.keras.metrics.Precision(name="precision", thresholds=THRESHOLD),
+            tf.keras.metrics.Recall(name="recall", thresholds=THRESHOLD),
+        ]
+    )
+    pbar = tqdm(total=epochs, desc=f"Training {stage_name}", file=sys.__stdout__)
+    for epoch in range(epochs):
+        model.fit(
+            generator,
+            validation_data=val_generator,
+            epochs=1,
+            callbacks=[RecallLogger()],
+            class_weight=class_weights,
+            verbose=0
+        )
+        pbar.update(1)
+    pbar.close()
+
 # === STAGE 1: Train head only ===
 if base_model is not None:
     for layer in base_model.layers:
         layer.trainable = False
-    print("\n[INFO] Stage 1: Training dense head only (frozen base_model)...\n")
 else:
     print("\n[INFO] Custom CNN: All layers are trainable by default. Skipping freezing.\n")
 
-model.compile(
-    optimizer=Adam(learning_rate=LR_STAGE1),
-    loss="binary_crossentropy",
-    metrics=[
-        tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
-        tf.keras.metrics.AUC(name="auc"),
-        tf.keras.metrics.Precision(name="precision", thresholds=THRESHOLD),
-        tf.keras.metrics.Recall(name="recall", thresholds=THRESHOLD),
-    ]
-)
-
-history_stage1 = model.fit(
-    train_gen,
-    validation_data=val_gen,
-    epochs=EPOCHS_STAGE1,
-    callbacks=[RecallLogger()],
-    class_weight=class_weights
-)
+train_with_progress_bar(train_gen, val_gen, EPOCHS_STAGE1, "Stage 1", LR_STAGE1)
 
 # === STAGE 2: Fine-tuning ===
 if base_model is not None:
@@ -135,21 +144,10 @@ if base_model is not None:
     for layer in base_model.layers[UNFREEZE_FROM_LAYER:]:
         if not isinstance(layer, tf.keras.layers.BatchNormalization):
             layer.trainable = True
-    print("\n[INFO] Stage 2: Fine-tuning model...\n")
 else:
     print("\n[INFO] Custom CNN: Skipping fine-tuning stage as no base_model exists.\n")
 
-model.compile(
-    optimizer=Adam(learning_rate=LR_STAGE2),
-    loss="binary_crossentropy",
-    metrics=[
-        tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
-        tf.keras.metrics.AUC(name="auc"),
-        tf.keras.metrics.Precision(name="precision", thresholds=THRESHOLD),
-        tf.keras.metrics.Recall(name="recall", thresholds=THRESHOLD),
-    ]
-)
-
+# === STAGE 2 TRAINING WITH CALLBACKS ===
 callbacks = [
     EarlyStopping(monitor="val_auc", mode="max", patience=50, restore_best_weights=True),
     ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
@@ -157,22 +155,23 @@ callbacks = [
     RecallLogger()
 ]
 
-history_stage2 = model.fit(
-    train_gen,
-    validation_data=val_gen,
-    epochs=EPOCHS_STAGE2,
-    callbacks=callbacks,
-    class_weight=class_weights
-)
+pbar = tqdm(total=EPOCHS_STAGE2, desc="Fine-tuning Stage 2", file=sys.__stdout__)
+for epoch in range(EPOCHS_STAGE2):
+    model.fit(
+        train_gen,
+        validation_data=val_gen,
+        epochs=1,
+        callbacks=callbacks,
+        class_weight=class_weights,
+        verbose=0
+    )
+    pbar.update(1)
+pbar.close()
 
 # === SAVE HISTORIES ===
-save_history(history_stage1, f"models/history_{model_name}_stage1.pkl")
-save_history(history_stage2, f"models/history_{model_name}_stage2.pkl")
+save_history(model.history, f"models/history_{model_name}.pkl")
 
-# === PLOTTING ===
-plot_history({f"{model_name}_stage1": history_stage1, f"{model_name}_stage2": history_stage2}, output_dir, ["accuracy", "loss", "auc", "recall"])
-
-# === THRESHOLDING (Youden's J statistic) ===
+# === THRESHOLDING ===
 print("[INFO] Calculating optimal threshold using Youden's J statistic...")
 
 y_val_prob = model.predict(val_gen).flatten()
@@ -192,9 +191,10 @@ else:
 threshold_path = os.path.join(output_dir, "optimal_threshold_val.txt")
 with open(threshold_path, "w") as f:
     f.write(f"{optimal_threshold:.4f}\n")
-print(f"[INFO] Threshold saved to: {threshold_path}")
 
 # === TRAINING TIME ===
 elapsed_time = time.time() - start_time
-print(f"[INFO] Total training time: {int(elapsed_time // 60)}m {int(elapsed_time % 60)}s")
+print(f"[INFO] Total training time: {int(elapsed_time // 60)}m {int(elapsed_time % 60)}s", file=sys.__stdout__)
+
+# === CLOSE LOG ===
 log_file.close()
