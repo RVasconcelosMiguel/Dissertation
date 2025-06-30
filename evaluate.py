@@ -7,7 +7,7 @@ from datetime import datetime
 
 # === CONFIGURATION ===
 model_name = "custom_cnn"  # options: "efficientnetb0", "efficientnetb1", "efficientnetb2", "custom_cnn"
-IMG_SIZE = 224
+IMG_SIZE = 128
 BATCH_SIZE = 32
 
 # === Paths ===

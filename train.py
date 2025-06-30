@@ -18,7 +18,7 @@ from plot_utils import plot_history
 
 # === CONFIGURATION ===
 model_name = "custom_cnn"
-IMG_SIZE = 224
+IMG_SIZE = 128
 BATCH_SIZE = 32
 
 EPOCHS_STAGE1 = 30
@@ -116,8 +116,10 @@ def train_with_progress_bar(generator, val_generator, epochs, stage_name, learni
         ]
     )
     pbar = tqdm(total=epochs, desc=f"Training {stage_name}", file=sys.__stdout__)
+    history_all = {'loss': [], 'accuracy': [], 'auc': [], 'precision': [], 'recall': [],
+                   'val_loss': [], 'val_accuracy': [], 'val_auc': [], 'val_precision': [], 'val_recall': []}
     for epoch in range(epochs):
-        model.fit(
+        history = model.fit(
             generator,
             validation_data=val_generator,
             epochs=1,
@@ -125,8 +127,11 @@ def train_with_progress_bar(generator, val_generator, epochs, stage_name, learni
             class_weight=class_weights,
             verbose=0
         )
+        for key in history.history:
+            history_all[key] += history.history[key]
         pbar.update(1)
     pbar.close()
+    return history_all
 
 # === STAGE 1: Train head only ===
 if base_model is not None:
@@ -135,7 +140,7 @@ if base_model is not None:
 else:
     print("\n[INFO] Custom CNN: All layers are trainable by default. Skipping freezing.\n")
 
-train_with_progress_bar(train_gen, val_gen, EPOCHS_STAGE1, "Stage 1", LR_STAGE1)
+history_stage1 = train_with_progress_bar(train_gen, val_gen, EPOCHS_STAGE1, "Stage 1", LR_STAGE1)
 
 # === STAGE 2: Fine-tuning ===
 if base_model is not None:
@@ -156,8 +161,10 @@ callbacks = [
 ]
 
 pbar = tqdm(total=EPOCHS_STAGE2, desc="Fine-tuning Stage 2", file=sys.__stdout__)
+history_stage2 = {'loss': [], 'accuracy': [], 'auc': [], 'precision': [], 'recall': [],
+                  'val_loss': [], 'val_accuracy': [], 'val_auc': [], 'val_precision': [], 'val_recall': []}
 for epoch in range(EPOCHS_STAGE2):
-    model.fit(
+    history = model.fit(
         train_gen,
         validation_data=val_gen,
         epochs=1,
@@ -165,11 +172,21 @@ for epoch in range(EPOCHS_STAGE2):
         class_weight=class_weights,
         verbose=0
     )
+    for key in history.history:
+        history_stage2[key] += history.history[key]
     pbar.update(1)
 pbar.close()
 
 # === SAVE HISTORIES ===
-save_history(model.history, f"models/history_{model_name}.pkl")
+save_history(history_stage1, f"models/history_{model_name}_stage1.pkl")
+save_history(history_stage2, f"models/history_{model_name}_stage2.pkl")
+
+# === PLOTTING ===
+plot_history(
+    {"stage1": history_stage1, "stage2": history_stage2},
+    save_path=output_dir,
+    metrics=["accuracy", "loss", "auc", "precision", "recall"]
+)
 
 # === THRESHOLDING ===
 print("[INFO] Calculating optimal threshold using Youden's J statistic...")

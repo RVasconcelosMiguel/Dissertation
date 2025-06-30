@@ -67,7 +67,9 @@ def build_custom_cnn(img_size, dropout, l2_lambda):
     x = BatchNormalization()(x)
     x = MaxPooling2D((2,2))(x)
 
-    x = Flatten()(x)
+    # === Replace Flatten with GlobalAveragePooling2D ===
+    x = GlobalAveragePooling2D()(x)
+
     x = Dense(128, activation='relu', kernel_regularizer=l2(l2_lambda))(x)
     x = Dropout(dropout)(x)
     x = Dense(64, activation='relu', kernel_regularizer=l2(l2_lambda))(x)
@@ -78,6 +80,7 @@ def build_custom_cnn(img_size, dropout, l2_lambda):
     base_model = None  # No pre-trained base model
 
     return model, base_model
+
 
 def build_model(model_name, img_size, dropout, l2_lambda):
     if model_name == "efficientnetb0":
