@@ -16,8 +16,8 @@ from data_loader import get_generators
 from plot_utils import plot_history
 
 # === CONFIGURATION ===
-model_name = "efficientnetb2"
-IMG_SIZE = 260
+model_name = "custom_cnn"  # Change model here
+IMG_SIZE = 224
 BATCH_SIZE = 32
 
 # Two-stage training hyperparameters
@@ -102,10 +102,12 @@ model, base_model = build_model(model_name, img_size=IMG_SIZE, dropout=DROPOUT, 
 model.summary()
 
 # === STAGE 1: Train head only ===
-for layer in base_model.layers:
-    layer.trainable = False
-
-print("\n[INFO] Stage 1: Training dense head only...\n")
+if base_model is not None:
+    for layer in base_model.layers:
+        layer.trainable = False
+    print("\n[INFO] Stage 1: Training dense head only (frozen base_model)...\n")
+else:
+    print("\n[INFO] Custom CNN: All layers are trainable by default. Skipping freezing.\n")
 
 model.compile(
     optimizer=Adam(learning_rate=LR_STAGE1),
@@ -122,17 +124,20 @@ history_stage1 = model.fit(
     train_gen,
     validation_data=val_gen,
     epochs=EPOCHS_STAGE1,
-    callbacks=[RecallLogger()]
+    callbacks=[RecallLogger()],
+    class_weight=class_weights
 )
 
 # === STAGE 2: Fine-tuning ===
-for layer in base_model.layers[:UNFREEZE_FROM_LAYER]:
-    layer.trainable = False
-for layer in base_model.layers[UNFREEZE_FROM_LAYER:]:
-    if not isinstance(layer, tf.keras.layers.BatchNormalization):
-        layer.trainable = True
-
-print("\n[INFO] Stage 2: Fine-tuning model...\n")
+if base_model is not None:
+    for layer in base_model.layers[:UNFREEZE_FROM_LAYER]:
+        layer.trainable = False
+    for layer in base_model.layers[UNFREEZE_FROM_LAYER:]:
+        if not isinstance(layer, tf.keras.layers.BatchNormalization):
+            layer.trainable = True
+    print("\n[INFO] Stage 2: Fine-tuning model...\n")
+else:
+    print("\n[INFO] Custom CNN: Skipping fine-tuning stage as no base_model exists.\n")
 
 model.compile(
     optimizer=Adam(learning_rate=LR_STAGE2),
@@ -156,7 +161,8 @@ history_stage2 = model.fit(
     train_gen,
     validation_data=val_gen,
     epochs=EPOCHS_STAGE2,
-    callbacks=callbacks
+    callbacks=callbacks,
+    class_weight=class_weights
 )
 
 # === SAVE HISTORIES ===

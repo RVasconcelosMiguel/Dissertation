@@ -6,8 +6,8 @@ import warnings
 from datetime import datetime
 
 # === CONFIGURATION ===
-model_name = "efficientnetb2"  # options: "efficientnetb0", "efficientnetb1", "efficientnetb2"
-IMG_SIZE = 260
+model_name = "custom_cnn"  # options: "efficientnetb0", "efficientnetb1", "efficientnetb2", "custom_cnn"
+IMG_SIZE = 224
 BATCH_SIZE = 32
 
 # === Paths ===

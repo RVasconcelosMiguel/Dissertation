@@ -1,5 +1,5 @@
 from tensorflow.keras.applications import EfficientNetB0, EfficientNetB1, EfficientNetB2
-from tensorflow.keras.layers import Input, GlobalAveragePooling2D, Dropout, Dense, BatchNormalization
+from tensorflow.keras.layers import Input, Conv2D, MaxPooling2D, Flatten, Dropout, Dense, BatchNormalization, GlobalAveragePooling2D
 from tensorflow.keras.models import Model
 from tensorflow.keras.regularizers import l2
 from tensorflow.keras.activations import swish
@@ -52,6 +52,33 @@ def build_efficientnetb2(img_size, dropout, l2_lambda):
     model = Model(inputs=base_model.input, outputs=output)
     return model, base_model
 
+def build_custom_cnn(img_size, dropout, l2_lambda):
+    input_tensor = Input(shape=(img_size, img_size, 3))
+
+    x = Conv2D(32, (3,3), activation='relu', padding='same', kernel_regularizer=l2(l2_lambda))(input_tensor)
+    x = BatchNormalization()(x)
+    x = MaxPooling2D((2,2))(x)
+
+    x = Conv2D(64, (3,3), activation='relu', padding='same', kernel_regularizer=l2(l2_lambda))(x)
+    x = BatchNormalization()(x)
+    x = MaxPooling2D((2,2))(x)
+
+    x = Conv2D(128, (3,3), activation='relu', padding='same', kernel_regularizer=l2(l2_lambda))(x)
+    x = BatchNormalization()(x)
+    x = MaxPooling2D((2,2))(x)
+
+    x = Flatten()(x)
+    x = Dense(128, activation='relu', kernel_regularizer=l2(l2_lambda))(x)
+    x = Dropout(dropout)(x)
+    x = Dense(64, activation='relu', kernel_regularizer=l2(l2_lambda))(x)
+    x = Dropout(dropout)(x)
+    output = Dense(1, activation='sigmoid', kernel_regularizer=l2(l2_lambda))(x)
+
+    model = Model(inputs=input_tensor, outputs=output)
+    base_model = None  # No pre-trained base model
+
+    return model, base_model
+
 def build_model(model_name, img_size, dropout, l2_lambda):
     if model_name == "efficientnetb0":
         return build_efficientnetb0(img_size, dropout, l2_lambda)
@@ -59,5 +86,7 @@ def build_model(model_name, img_size, dropout, l2_lambda):
         return build_efficientnetb1(img_size, dropout, l2_lambda)
     elif model_name == "efficientnetb2":
         return build_efficientnetb2(img_size, dropout, l2_lambda)
+    elif model_name == "custom_cnn":
+        return build_custom_cnn(img_size, dropout, l2_lambda)
     else:
         raise ValueError(f"Unsupported model name: {model_name}")
