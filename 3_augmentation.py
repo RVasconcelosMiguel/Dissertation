@@ -7,8 +7,6 @@ from tqdm import tqdm
 import albumentations as A
 from sklearn.model_selection import train_test_split
 
-IMG_SIZE = 260
-
 # === Define target final number of images per class ===
 TARGET_COUNT_PER_CLASS = {
     0: 1000,  # class 0 (benign)
@@ -76,13 +74,7 @@ augment = A.Compose([
     A.HueSaturationValue(hue_shift_limit=5, sat_shift_limit=10, val_shift_limit=10, p=0.3),
     A.Rotate(limit=45, p=0.5),
     A.ElasticTransform(alpha=0.5, sigma=20, p=0.1),
-    A.ISONoise(color_shift=(0.01, 0.01), intensity=(0.01, 0.03), p=0.1),
-    A.RandomResizedCrop(
-        size=(IMG_SIZE, IMG_SIZE),
-        scale=(0.8, 1.0),
-        ratio=(0.75, 1.33),
-        p=0.5
-    )
+    A.ISONoise(color_shift=(0.01, 0.01), intensity=(0.01, 0.03), p=0.1)
 ])
 
 
