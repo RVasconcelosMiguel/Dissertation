@@ -85,7 +85,8 @@ for key in input_folders:
         img_sharp = Image.merge('RGB', (r, g, b))
 
         # Resize and save
-        img_resized = img_sharp.resize((260, 260), Image.BICUBIC)
-        img_resized.save(processed_path)
+        #img_resized = img_sharp.resize((260, 260), Image.BICUBIC)
+
+        img_sharp.save(processed_path)
 
     print(f"{key.upper()}: {len(all_images)} images processed.")
