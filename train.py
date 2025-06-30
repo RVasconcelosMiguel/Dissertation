@@ -194,7 +194,7 @@ with open(threshold_path, "w") as f:
 
 # === TRAINING TIME ===
 elapsed_time = time.time() - start_time
-print(f"[INFO] Total training time: {int(elapsed_time // 60)}m {int(elapsed_time % 60)}s", file=sys.__stdout__)
+print(f"[INFO] Total training time : {int(elapsed_time // 60)}m {int(elapsed_time % 60)}s", file=sys.__stdout__)
 
 # === CLOSE LOG ===
 log_file.close()
