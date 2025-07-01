@@ -20,9 +20,9 @@ from losses import focal_loss  # <=== IMPORT FOCAL LOSS
 # === CONFIGURATION ===
 model_name = "custom_cnn"
 IMG_SIZE = 128
-BATCH_SIZE = 32
+BATCH_SIZE = 64
 EPOCHS = 5
-LEARNING_RATE = 1e-4
+LEARNING_RATE = 1e-5
 DROPOUT = 0.4
 L2_REG = 1e-4
 CALCULATE_OPTIMAL_THRESHOLD = True
@@ -86,7 +86,7 @@ model.summary()
 # === COMPILE MODEL WITH FOCAL LOSS ===
 model.compile(
     optimizer=Adam(learning_rate=LEARNING_RATE),
-    loss=focal_loss(alpha=0.5, gamma=2.0),  # <=== FOCAL LOSS USED HERE
+    loss=focal_loss(alpha=0.75, gamma=3.0),  # <=== FOCAL LOSS USED HERE
     metrics=[
         tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
         tf.keras.metrics.AUC(name="auc"),
