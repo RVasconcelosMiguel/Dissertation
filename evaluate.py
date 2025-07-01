@@ -5,14 +5,9 @@ import logging
 import warnings
 from datetime import datetime
 
-from model import build_model
-from data_loader import get_generators
-from plot_utils import save_confusion_matrix, save_roc_curve
-
-
 # === CONFIGURATION ===
-model_name = "custom_cnn"
-IMG_SIZE = 128
+model_name = "efficientnetb1"
+IMG_SIZE = 240
 BATCH_SIZE = 64
 
 # === Paths ===
@@ -59,8 +54,8 @@ print(f"[INFO] Building model architecture: {model_name}...")
 model, _ = build_model(
     model_name=model_name,
     img_size=IMG_SIZE,
-    dropout=0.0,
-    l2_lambda=1e-4
+    dropout=0.3,
+    l2_lambda=1e-3
 )
 
 # === Load Trained Weights ===
@@ -101,7 +96,7 @@ print(f"[INFO] ROC curve saved to {roc_curve_path}")
 print(f"[INFO] Test ROC AUC: {roc_auc:.4f}")
 
 # === Threshold-based Predictions and Classification Report ===
-print("[INFO] Generating test predictions with loaded threshold (no threshold optimisation on test set)...")
+print("[INFO] Generating test predictions with loaded threshold...")
 y_pred = (y_prob >= optimal_threshold).astype(int)
 labels = list(test_gen.class_indices.keys())
 

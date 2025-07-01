@@ -15,18 +15,26 @@ from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLRO
 from model import build_model
 from data_loader import get_generators
 from plot_utils import plot_history
-from losses import focal_loss  # <=== IMPORT FOCAL LOSS
+from losses import focal_loss
 
 # === CONFIGURATION ===
-model_name = "custom_cnn"
-IMG_SIZE = 128
+model_name = "efficientnetb1"
+IMG_SIZE = 240
 BATCH_SIZE = 64
-EPOCHS = 5
-LEARNING_RATE = 1e-5
-DROPOUT = 0.4
-L2_REG = 1e-4
+
+EPOCHS_HEAD = 5
+EPOCHS_FINE = 10
+
+LEARNING_RATE_HEAD = 1e-4
+LEARNING_RATE_FINE = 1e-5
+
+DROPOUT = 0.3
+L2_REG = 1e-3
+
 CALCULATE_OPTIMAL_THRESHOLD = True
 THRESHOLD = 0.5
+
+FINE_TUNE_AT = -20  # unfreeze last 20 layers
 
 # === PATHS ===
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}"
@@ -83,10 +91,14 @@ print(f"Class weights {class_weights}\n")
 model, base_model = build_model(model_name, img_size=IMG_SIZE, dropout=DROPOUT, l2_lambda=L2_REG)
 model.summary()
 
-# === COMPILE MODEL WITH FOCAL LOSS ===
+# === HEAD TRAINING (freeze base model) ===
+if base_model is not None:
+    base_model.trainable = False
+    print("[INFO] Base model frozen for head training.")
+
 model.compile(
-    optimizer=Adam(learning_rate=LEARNING_RATE),
-    loss=focal_loss(alpha=0.75, gamma=3.0),  # <=== FOCAL LOSS USED HERE
+    optimizer=Adam(learning_rate=LEARNING_RATE_HEAD),
+    loss=focal_loss(alpha=0.25, gamma=2.0),
     metrics=[
         tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
         tf.keras.metrics.AUC(name="auc"),
@@ -103,33 +115,55 @@ callbacks = [
     RecallLogger()
 ]
 
-# === TRAINING WITH TQDM PROGRESS BAR ===
-pbar = tqdm(total=EPOCHS, desc="Training", file=sys.__stdout__)
-history_all = {'loss': [], 'accuracy': [], 'auc': [], 'precision': [], 'recall': [],
-               'val_loss': [], 'val_accuracy': [], 'val_auc': [], 'val_precision': [], 'val_recall': []}
+print("[INFO] Starting head training...")
+history_head = model.fit(
+    train_gen,
+    validation_data=val_gen,
+    epochs=EPOCHS_HEAD,
+    callbacks=callbacks,
+    class_weight=class_weights,
+    verbose=1
+)
 
-for epoch in range(EPOCHS):
-    history = model.fit(
+# === FINE-TUNING ===
+if base_model is not None:
+    print(f"[INFO] Unfreezing last {abs(FINE_TUNE_AT)} layers for fine-tuning.")
+    base_model.trainable = True
+    for layer in base_model.layers[:FINE_TUNE_AT]:
+        layer.trainable = False
+
+    model.compile(
+        optimizer=Adam(learning_rate=LEARNING_RATE_FINE),
+        loss=focal_loss(alpha=0.25, gamma=2.0),
+        metrics=[
+            tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
+            tf.keras.metrics.AUC(name="auc"),
+            tf.keras.metrics.Precision(name="precision", thresholds=THRESHOLD),
+            tf.keras.metrics.Recall(name="recall", thresholds=THRESHOLD),
+        ]
+    )
+
+    print("[INFO] Starting fine-tuning...")
+    history_fine = model.fit(
         train_gen,
         validation_data=val_gen,
-        epochs=1,
+        epochs=EPOCHS_FINE,
         callbacks=callbacks,
         class_weight=class_weights,
-        verbose=0
+        verbose=1
     )
-    for key in history.history:
-        if key in history_all:
-            history_all[key] += history.history[key]
-        else:
-            history_all[key] = history.history[key]
-    pbar.update(1)
-pbar.close()
+else:
+    history_fine = None
 
 # === SAVE HISTORY ===
+history_all = {
+    'head': history_head.history,
+    'fine': history_fine.history if history_fine else {}
+}
 save_history(history_all, f"models/history_{model_name}.pkl")
 
 # === PLOTTING ===
-plot_history({"train": history_all}, save_path=output_dir,
+plot_history(history_all, save_path=output_dir,
              metrics=["accuracy", "loss", "auc", "precision", "recall"])
 
 # === THRESHOLDING ===
