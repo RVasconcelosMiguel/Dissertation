@@ -7,7 +7,6 @@ from tensorflow.keras.activations import swish
 def build_efficientnetb0(img_size, dropout, l2_lambda):
     input_tensor = Input(shape=(img_size, img_size, 3))
     base_model = EfficientNetB0(include_top=False, weights="imagenet", input_tensor=input_tensor)
-
     x = base_model.output
     x = GlobalAveragePooling2D()(x)
     x = BatchNormalization()(x)
@@ -16,14 +15,12 @@ def build_efficientnetb0(img_size, dropout, l2_lambda):
     x = Dense(128, activation=swish, kernel_regularizer=l2(l2_lambda))(x)
     x = Dropout(dropout)(x)
     output = Dense(1, activation="sigmoid", kernel_regularizer=l2(l2_lambda))(x)
-
     model = Model(inputs=base_model.input, outputs=output)
     return model, base_model
 
 def build_efficientnetb1(img_size, dropout, l2_lambda):
     input_tensor = Input(shape=(img_size, img_size, 3))
     base_model = EfficientNetB1(include_top=False, weights="imagenet", input_tensor=input_tensor)
-
     x = base_model.output
     x = GlobalAveragePooling2D()(x)
     x = BatchNormalization()(x)
@@ -32,14 +29,12 @@ def build_efficientnetb1(img_size, dropout, l2_lambda):
     x = Dense(128, activation=swish, kernel_regularizer=l2(l2_lambda))(x)
     x = Dropout(dropout)(x)
     output = Dense(1, activation="sigmoid", kernel_regularizer=l2(l2_lambda))(x)
-
     model = Model(inputs=base_model.input, outputs=output)
     return model, base_model
 
 def build_efficientnetb2(img_size, dropout, l2_lambda):
     input_tensor = Input(shape=(img_size, img_size, 3))
     base_model = EfficientNetB2(include_top=False, weights="imagenet", input_tensor=input_tensor)
-
     x = base_model.output
     x = GlobalAveragePooling2D()(x)
     x = BatchNormalization()(x)
@@ -48,39 +43,29 @@ def build_efficientnetb2(img_size, dropout, l2_lambda):
     x = Dense(128, activation=swish, kernel_regularizer=l2(l2_lambda))(x)
     x = Dropout(dropout)(x)
     output = Dense(1, activation="sigmoid", kernel_regularizer=l2(l2_lambda))(x)
-
     model = Model(inputs=base_model.input, outputs=output)
     return model, base_model
 
 def build_custom_cnn(img_size, dropout, l2_lambda):
     input_tensor = Input(shape=(img_size, img_size, 3))
-
-    x = Conv2D(32, (3,3), activation='relu', padding='same', kernel_regularizer=l2(l2_lambda))(input_tensor)
+    x = Conv2D(64, (3,3), activation='relu', padding='same', kernel_regularizer=l2(l2_lambda))(input_tensor)
     x = BatchNormalization()(x)
     x = MaxPooling2D((2,2))(x)
-
-    x = Conv2D(64, (3,3), activation='relu', padding='same', kernel_regularizer=l2(l2_lambda))(x)
-    x = BatchNormalization()(x)
-    x = MaxPooling2D((2,2))(x)
-
     x = Conv2D(128, (3,3), activation='relu', padding='same', kernel_regularizer=l2(l2_lambda))(x)
     x = BatchNormalization()(x)
     x = MaxPooling2D((2,2))(x)
-
-    # === Replace Flatten with GlobalAveragePooling2D ===
-    x = GlobalAveragePooling2D()(x)
-
+    x = Conv2D(256, (3,3), activation='relu', padding='same', kernel_regularizer=l2(l2_lambda))(x)
+    x = BatchNormalization()(x)
+    x = MaxPooling2D((2,2))(x)
+    x = GlobalAveragePooling2D()(x)  # Recommended over Flatten
     x = Dense(128, activation='relu', kernel_regularizer=l2(l2_lambda))(x)
     x = Dropout(dropout)(x)
     x = Dense(64, activation='relu', kernel_regularizer=l2(l2_lambda))(x)
     x = Dropout(dropout)(x)
     output = Dense(1, activation='sigmoid', kernel_regularizer=l2(l2_lambda))(x)
-
     model = Model(inputs=input_tensor, outputs=output)
-    base_model = None  # No pre-trained base model
-
+    base_model = None
     return model, base_model
-
 
 def build_model(model_name, img_size, dropout, l2_lambda):
     if model_name == "efficientnetb0":

@@ -20,11 +20,10 @@ from plot_utils import plot_history
 model_name = "custom_cnn"
 IMG_SIZE = 128
 BATCH_SIZE = 32
-EPOCHS = 30
-LEARNING_RATE = 1e-3
-
-DROPOUT = 0.2
-L2_REG = 5e-4
+EPOCHS = 50  # Increased for proper convergence with adjusted learning rate
+LEARNING_RATE = 1e-4
+DROPOUT = 0.3
+L2_REG = 1e-4
 CALCULATE_OPTIMAL_THRESHOLD = True
 THRESHOLD = 0.5
 
@@ -47,17 +46,6 @@ sys.stderr = log_file
 print("TensorFlow version:", tf.__version__)
 print("GPU available:", tf.config.list_physical_devices('GPU'))
 
-gpus = tf.config.list_physical_devices('GPU')
-if gpus:
-    try:
-        for gpu in gpus:
-            tf.config.experimental.set_memory_growth(gpu, True)
-        print("Enabled GPU memory growth.")
-    except RuntimeError as e:
-        print("Error enabling memory growth:", e)
-else:
-    print("No GPU found — using CPU.")
-
 # === HELPER FUNCTIONS ===
 def print_distribution(name, df):
     counts = df['label'].astype(int).value_counts().sort_index()
@@ -66,7 +54,7 @@ def print_distribution(name, df):
 def save_history(history, filename):
     try:
         with open(filename, "wb") as f:
-            pickle.dump(history.history, f)
+            pickle.dump(history, f)
         print(f"[DEBUG] History saved to {filename}")
     except Exception as e:
         print(f"[ERROR] Could not save history using pickle: {e}")
@@ -87,7 +75,6 @@ train_df, val_df, test_df, train_gen, val_gen, test_gen = get_generators(IMG_SIZ
 print_distribution("Train", train_df)
 print_distribution("Validation", val_df)
 print_distribution("Test", test_df)
-
 class_weights = compute_class_weights(train_df)
 print(f"Class weights {class_weights}\n")
 
@@ -125,7 +112,7 @@ for epoch in range(EPOCHS):
         train_gen,
         validation_data=val_gen,
         epochs=1,
-        callbacks=[RecallLogger()],
+        callbacks=callbacks,
         class_weight=class_weights,
         verbose=0
     )
@@ -135,25 +122,19 @@ for epoch in range(EPOCHS):
         else:
             history_all[key] = history.history[key]
     pbar.update(1)
-
 pbar.close()
 
 # === SAVE HISTORY ===
-save_history(history, f"models/history_{model_name}.pkl")
+save_history(history_all, f"models/history_{model_name}.pkl")
 
 # === PLOTTING ===
-plot_history(
-    {"train": history_all},
-    save_path=output_dir,
-    metrics=["accuracy", "loss", "auc", "precision", "recall"]
-)
+plot_history({"train": history_all}, save_path=output_dir,
+             metrics=["accuracy", "loss", "auc", "precision", "recall"])
 
 # === THRESHOLDING ===
 print("[INFO] Calculating optimal threshold using Youden's J statistic...")
-
 y_val_prob = model.predict(val_gen).flatten()
 y_val_true = np.array(val_gen.classes)
-
 if CALCULATE_OPTIMAL_THRESHOLD:
     fpr, tpr, thresholds = roc_curve(y_val_true, y_val_prob)
     youden_index = tpr - fpr
