@@ -91,6 +91,14 @@ print(f"Class weights {class_weights}\n")
 model, base_model = build_model(model_name, img_size=IMG_SIZE, dropout=DROPOUT, l2_lambda=L2_REG)
 model.summary()
 
+# === CALLBACKS ===
+callbacks = [
+    EarlyStopping(monitor="val_auc", mode="max", patience=10, restore_best_weights=True),
+    ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
+    ReduceLROnPlateau(monitor="val_auc", mode="max", factor=0.5, patience=5, min_lr=1e-7, verbose=1),
+    RecallLogger()
+]
+
 # === HEAD TRAINING (freeze base model) ===
 if base_model is not None:
     base_model.trainable = False
@@ -107,32 +115,34 @@ model.compile(
     ]
 )
 
-# === CALLBACKS ===
-callbacks = [
-    EarlyStopping(monitor="val_auc", mode="max", patience=10, restore_best_weights=True),
-    ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
-    ReduceLROnPlateau(monitor="val_auc", mode="max", factor=0.5, patience=5, min_lr=1e-7, verbose=1),
-    RecallLogger()
-]
-
 print("[INFO] Starting head training...")
-history_head = model.fit(
-    train_gen,
-    validation_data=val_gen,
-    epochs=EPOCHS_HEAD,
-    callbacks=callbacks,
-    class_weight=class_weights,
-    verbose=1
-)
+history_head_all = {'loss': [], 'accuracy': [], 'auc': [], 'precision': [], 'recall': [],
+                    'val_loss': [], 'val_accuracy': [], 'val_auc': [], 'val_precision': [], 'val_recall': []}
+
+pbar_head = tqdm(total=EPOCHS_HEAD, desc="Head Training", file=sys.__stdout__)
+for epoch in range(EPOCHS_HEAD):
+    history = model.fit(
+        train_gen,
+        validation_data=val_gen,
+        epochs=1,
+        callbacks=callbacks,
+        class_weight=class_weights,
+        verbose=0  # silent to terminal but logs redirected
+    )
+    for key in history.history:
+        if key in history_head_all:
+            history_head_all[key] += history.history[key]
+        else:
+            history_head_all[key] = history.history[key]
+    pbar_head.update(1)
+pbar_head.close()
 
 # === FINE-TUNING ===
-# Unfreeze the last abs(FINE_TUNE_AT) layers for fine-tuning
 if base_model is not None:
     print(f"[INFO] Unfreezing last {abs(FINE_TUNE_AT)} layers for fine-tuning.")
-    base_model.trainable = True  # Allow the entire base model to be trainable
+    base_model.trainable = True
     for layer in base_model.layers[:FINE_TUNE_AT]:
-        layer.trainable = False  # Re-freeze earlier layers to avoid overfitting and speed up training
-
+        layer.trainable = False
 
     model.compile(
         optimizer=Adam(learning_rate=LEARNING_RATE_FINE),
@@ -146,21 +156,33 @@ if base_model is not None:
     )
 
     print("[INFO] Starting fine-tuning...")
-    history_fine = model.fit(
-        train_gen,
-        validation_data=val_gen,
-        epochs=EPOCHS_FINE,
-        callbacks=callbacks,
-        class_weight=class_weights,
-        verbose=1
-    )
+    history_fine_all = {'loss': [], 'accuracy': [], 'auc': [], 'precision': [], 'recall': [],
+                        'val_loss': [], 'val_accuracy': [], 'val_auc': [], 'val_precision': [], 'val_recall': []}
+
+    pbar_fine = tqdm(total=EPOCHS_FINE, desc="Fine Tuning", file=sys.__stdout__)
+    for epoch in range(EPOCHS_FINE):
+        history = model.fit(
+            train_gen,
+            validation_data=val_gen,
+            epochs=1,
+            callbacks=callbacks,
+            class_weight=class_weights,
+            verbose=0
+        )
+        for key in history.history:
+            if key in history_fine_all:
+                history_fine_all[key] += history.history[key]
+            else:
+                history_fine_all[key] = history.history[key]
+        pbar_fine.update(1)
+    pbar_fine.close()
 else:
-    history_fine = None
+    history_fine_all = None
 
 # === SAVE HISTORY ===
 history_all = {
-    'head': history_head.history,
-    'fine': history_fine.history if history_fine else {}
+    'head': history_head_all,
+    'fine': history_fine_all if history_fine_all else {}
 }
 save_history(history_all, f"models/history_{model_name}.pkl")
 
