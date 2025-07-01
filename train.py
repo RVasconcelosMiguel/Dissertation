@@ -22,19 +22,19 @@ model_name = "efficientnetb1"
 IMG_SIZE = 240
 BATCH_SIZE = 64
 
-EPOCHS_HEAD = 5
-EPOCHS_FINE = 20
+EPOCHS_HEAD = 15
+EPOCHS_FINE = 50
 
 LEARNING_RATE_HEAD = 1e-4
 LEARNING_RATE_FINE = 1e-4
 
-DROPOUT = 0.3
-L2_REG = 0
+DROPOUT = 0.4
+L2_REG = 1e-4
 
 CALCULATE_OPTIMAL_THRESHOLD = True
 THRESHOLD = 0.5
 
-FINE_TUNE_AT = -50
+FINE_TUNE_AT = -100
 
 # === PATHS ===
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}"
