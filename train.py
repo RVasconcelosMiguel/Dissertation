@@ -225,6 +225,8 @@ with open(threshold_path, "w") as f:
 elapsed_time = time.time() - start_time
 print(f"[INFO] Total training time: {int(elapsed_time // 60)}m {int(elapsed_time % 60)}s", file=sys.__stdout__)
 
+print(history_head.history)
+
 # === CLOSE LOG ===
 sys.stdout = sys.__stdout__
 sys.stderr = sys.__stderr__
