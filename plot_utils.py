@@ -7,25 +7,16 @@ import os
 import matplotlib.pyplot as plt
 
 def plot_history(histories, save_path, metrics):
-    """
-    Plots and saves training history curves for specified metrics.
-
-    Args:
-        histories (dict): Dictionary containing 'head' and/or 'fine' training histories.
-        save_path (str): Directory to save plots.
-        metrics (list): List of metric names to plot.
-    """
     os.makedirs(save_path, exist_ok=True)
 
     for metric in metrics:
         plt.figure(figsize=(8, 5))
-        plotted_any = False  # Track if anything was plotted for this metric
+        plotted_any = False
 
         for name, hist in histories.items():
             if not hist:
-                continue  # skip empty histories
+                continue
 
-            # Support both Keras History objects and dicts
             history_dict = hist.history if hasattr(hist, "history") else hist
 
             train_metric = history_dict.get(metric, [])

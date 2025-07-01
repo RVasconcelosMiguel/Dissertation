@@ -120,21 +120,16 @@ model.compile(
     ]
 )
 
-# === Progress Bar for Head Training ===
+# === Train head in a single fit call ===
 print("[INFO] Starting head training...")
-pbar_head = tqdm(total=EPOCHS_HEAD, desc="Head Training", file=sys.__stdout__)
-
-for epoch in range(EPOCHS_HEAD):
-    history_head = model.fit(
-        train_gen,
-        validation_data=val_gen,
-        epochs=1,
-        callbacks=callbacks,
-        class_weight=class_weights,
-        verbose=1  # will print to log
-    )
-    pbar_head.update(1)
-pbar_head.close()
+history_head = model.fit(
+    train_gen,
+    validation_data=val_gen,
+    epochs=EPOCHS_HEAD,
+    callbacks=callbacks,
+    class_weight=class_weights,
+    verbose=1
+)
 
 # === FINE-TUNING ===
 if base_model is not None:
@@ -158,21 +153,16 @@ if base_model is not None:
         ]
     )
 
-    # === Progress Bar for Fine Tuning ===
+    # === Train fine-tuning in a single fit call ===
     print("[INFO] Starting fine-tuning...")
-    pbar_fine = tqdm(total=EPOCHS_FINE, desc="Fine Tuning", file=sys.__stdout__)
-
-    for epoch in range(EPOCHS_FINE):
-        history_fine = model.fit(
-            train_gen,
-            validation_data=val_gen,
-            epochs=1,
-            callbacks=callbacks,
-            class_weight=class_weights,
-            verbose=1  # will print to log
-        )
-        pbar_fine.update(1)
-    pbar_fine.close()
+    history_fine = model.fit(
+        train_gen,
+        validation_data=val_gen,
+        epochs=EPOCHS_FINE,
+        callbacks=callbacks,
+        class_weight=class_weights,
+        verbose=1
+    )
 else:
     history_fine = None
 
