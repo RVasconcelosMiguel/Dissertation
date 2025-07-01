@@ -26,7 +26,7 @@ EPOCHS_HEAD = 5
 EPOCHS_FINE = 10
 
 LEARNING_RATE_HEAD = 1e-4
-LEARNING_RATE_FINE = 1e-5
+LEARNING_RATE_FINE = 5e-5  # Increased for meaningful fine-tuning
 
 DROPOUT = 0.3
 L2_REG = 1e-3
@@ -34,7 +34,7 @@ L2_REG = 1e-3
 CALCULATE_OPTIMAL_THRESHOLD = True
 THRESHOLD = 0.5
 
-FINE_TUNE_AT = -20  # unfreeze last 20 layers
+FINE_TUNE_AT = -50  # unfreeze last 50 layers now
 
 # === PATHS ===
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}"
@@ -87,6 +87,11 @@ print_distribution("Test", test_df)
 class_weights = compute_class_weights(train_df)
 print(f"Class weights {class_weights}\n")
 
+# === Verify data pipeline sample ===
+print("[DEBUG] Displaying a sample training batch labels:")
+x_batch, y_batch = next(train_gen)
+print("Labels sample:", y_batch[:10])
+
 # === MODEL CONSTRUCTION ===
 model, base_model = build_model(model_name, img_size=IMG_SIZE, dropout=DROPOUT, l2_lambda=L2_REG)
 model.summary()
@@ -116,26 +121,14 @@ model.compile(
 )
 
 print("[INFO] Starting head training...")
-history_head_all = {'loss': [], 'accuracy': [], 'auc': [], 'precision': [], 'recall': [],
-                    'val_loss': [], 'val_accuracy': [], 'val_auc': [], 'val_precision': [], 'val_recall': []}
-
-pbar_head = tqdm(total=EPOCHS_HEAD, desc="Head Training", file=sys.__stdout__)
-for epoch in range(EPOCHS_HEAD):
-    history = model.fit(
-        train_gen,
-        validation_data=val_gen,
-        epochs=1,
-        callbacks=callbacks,
-        class_weight=class_weights,
-        verbose=0  # silent to terminal but logs redirected
-    )
-    for key in history.history:
-        if key in history_head_all:
-            history_head_all[key] += history.history[key]
-        else:
-            history_head_all[key] = history.history[key]
-    pbar_head.update(1)
-pbar_head.close()
+history_head = model.fit(
+    train_gen,
+    validation_data=val_gen,
+    epochs=EPOCHS_HEAD,
+    callbacks=callbacks,
+    class_weight=class_weights,
+    verbose=1
+)
 
 # === FINE-TUNING ===
 if base_model is not None:
@@ -143,6 +136,11 @@ if base_model is not None:
     base_model.trainable = True
     for layer in base_model.layers[:FINE_TUNE_AT]:
         layer.trainable = False
+
+    # === Print trainable status summary ===
+    print("[DEBUG] Layer trainable status after unfreezing:")
+    for layer in base_model.layers:
+        print(f"{layer.name}: {layer.trainable}")
 
     model.compile(
         optimizer=Adam(learning_rate=LEARNING_RATE_FINE),
@@ -156,33 +154,21 @@ if base_model is not None:
     )
 
     print("[INFO] Starting fine-tuning...")
-    history_fine_all = {'loss': [], 'accuracy': [], 'auc': [], 'precision': [], 'recall': [],
-                        'val_loss': [], 'val_accuracy': [], 'val_auc': [], 'val_precision': [], 'val_recall': []}
-
-    pbar_fine = tqdm(total=EPOCHS_FINE, desc="Fine Tuning", file=sys.__stdout__)
-    for epoch in range(EPOCHS_FINE):
-        history = model.fit(
-            train_gen,
-            validation_data=val_gen,
-            epochs=1,
-            callbacks=callbacks,
-            class_weight=class_weights,
-            verbose=0
-        )
-        for key in history.history:
-            if key in history_fine_all:
-                history_fine_all[key] += history.history[key]
-            else:
-                history_fine_all[key] = history.history[key]
-        pbar_fine.update(1)
-    pbar_fine.close()
+    history_fine = model.fit(
+        train_gen,
+        validation_data=val_gen,
+        epochs=EPOCHS_FINE,
+        callbacks=callbacks,
+        class_weight=class_weights,
+        verbose=1
+    )
 else:
-    history_fine_all = None
+    history_fine = None
 
 # === SAVE HISTORY ===
 history_all = {
-    'head': history_head_all,
-    'fine': history_fine_all if history_fine_all else {}
+    'head': history_head.history,
+    'fine': history_fine.history if history_fine else {}
 }
 save_history(history_all, f"models/history_{model_name}.pkl")
 
