@@ -5,8 +5,13 @@ import logging
 import warnings
 from datetime import datetime
 
+from model import build_model
+from data_loader import get_generators
+from plot_utils import save_confusion_matrix, save_roc_curve
+
+
 # === CONFIGURATION ===
-model_name = "custom_cnn"  # options: "efficientnetb0", "efficientnetb1", "efficientnetb2", "custom_cnn"
+model_name = "custom_cnn"
 IMG_SIZE = 128
 BATCH_SIZE = 32
 
@@ -14,7 +19,7 @@ BATCH_SIZE = 32
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}"
 os.makedirs(output_dir, exist_ok=True)
 
-WEIGHTS_PATH = f"models/{model_name}_finetuned_weights"
+WEIGHTS_PATH = f"models/{model_name}_weights"
 threshold_path = os.path.join(output_dir, "optimal_threshold_val.txt")
 log_file_path = os.path.join(output_dir, "evaluate_log.txt")
 
@@ -35,12 +40,11 @@ print(f"[INFO] Evaluation started at: {start_time.isoformat()}")
 # === Imports ===
 import tensorflow as tf
 import numpy as np
-import matplotlib.pyplot as plt
-from sklearn.metrics import classification_report, roc_curve, roc_auc_score
+from sklearn.metrics import classification_report, roc_auc_score
 
 from model import build_model
 from data_loader import get_generators
-from plot_utils import save_confusion_matrix
+from plot_utils import save_confusion_matrix, save_roc_curve
 
 # === Load saved optimal threshold from validation ===
 with open(threshold_path, "r") as f:
@@ -90,18 +94,11 @@ print("[INFO] Generating ROC curve for test set...")
 y_prob = model.predict(test_gen).flatten()
 y_true = np.array(test_gen.classes)
 
-fpr, tpr, thresholds = roc_curve(y_true, y_prob)
+roc_curve_path = os.path.join(output_dir, "roc_curve_test.png")
+save_roc_curve(y_true, y_prob, roc_curve_path)
 roc_auc = roc_auc_score(y_true, y_prob)
-
-plt.figure()
-plt.plot(fpr, tpr, label=f"AUC = {roc_auc:.4f}")
-plt.plot([0, 1], [0, 1], 'k--')
-plt.xlabel("False Positive Rate")
-plt.ylabel("True Positive Rate")
-plt.title(f"ROC Curve (Test Set) - {model_name}")
-plt.legend()
-plt.savefig(os.path.join(output_dir, "roc_curve_test.png"))
-plt.close()
+print(f"[INFO] ROC curve saved to {roc_curve_path}")
+print(f"[INFO] Test ROC AUC: {roc_auc:.4f}")
 
 # === Threshold-based Predictions and Classification Report ===
 print("[INFO] Generating test predictions with loaded threshold (no threshold optimisation on test set)...")
@@ -113,14 +110,18 @@ print("[INFO] Classification report:")
 print(report)
 
 # === Save Confusion Matrix ===
-save_confusion_matrix(y_true, y_pred, labels, os.path.join(output_dir, "confusion_matrix_tuned.png"))
+conf_matrix_path = os.path.join(output_dir, "confusion_matrix_tuned.png")
+save_confusion_matrix(y_true, y_pred, labels, conf_matrix_path)
+print(f"[INFO] Confusion matrix saved to {conf_matrix_path}")
 
 # === Save Evaluation Report ===
-with open(os.path.join(output_dir, "evaluation_report.txt"), "w") as f:
+eval_report_path = os.path.join(output_dir, "evaluation_report.txt")
+with open(eval_report_path, "w") as f:
     f.write(f"Model evaluated: {model_name}\n")
     f.write(f"Threshold used (from validation): {optimal_threshold:.4f}\n")
     f.write(f"Test ROC AUC: {roc_auc:.4f}\n\n")
     f.write(report)
+print(f"[INFO] Evaluation report saved to {eval_report_path}")
 
 end_time = datetime.now()
 duration = end_time - start_time
