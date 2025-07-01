@@ -26,15 +26,15 @@ EPOCHS_HEAD = 5
 EPOCHS_FINE = 10
 
 LEARNING_RATE_HEAD = 1e-4
-LEARNING_RATE_FINE = 1e-4  # Increased for meaningful fine-tuning
+LEARNING_RATE_FINE = 1e-4
 
 DROPOUT = 0.3
-L2_REG = 0#1e-4
+L2_REG = 0
 
 CALCULATE_OPTIMAL_THRESHOLD = True
 THRESHOLD = 0.5
 
-FINE_TUNE_AT = -50  # unfreeze last 50 layers now
+FINE_TUNE_AT = -50
 
 # === PATHS ===
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}"
@@ -104,7 +104,7 @@ callbacks = [
     RecallLogger()
 ]
 
-# === HEAD TRAINING (freeze base model) ===
+# === HEAD TRAINING ===
 if base_model is not None:
     base_model.trainable = False
     print("[INFO] Base model frozen for head training.")
@@ -120,15 +120,21 @@ model.compile(
     ]
 )
 
+# === Progress Bar for Head Training ===
 print("[INFO] Starting head training...")
-history_head = model.fit(
-    train_gen,
-    validation_data=val_gen,
-    epochs=EPOCHS_HEAD,
-    callbacks=callbacks,
-    class_weight=class_weights,
-    verbose=1
-)
+pbar_head = tqdm(total=EPOCHS_HEAD, desc="Head Training", file=sys.__stdout__)
+
+for epoch in range(EPOCHS_HEAD):
+    history_head = model.fit(
+        train_gen,
+        validation_data=val_gen,
+        epochs=1,
+        callbacks=callbacks,
+        class_weight=class_weights,
+        verbose=1  # will print to log
+    )
+    pbar_head.update(1)
+pbar_head.close()
 
 # === FINE-TUNING ===
 if base_model is not None:
@@ -137,7 +143,6 @@ if base_model is not None:
     for layer in base_model.layers[:FINE_TUNE_AT]:
         layer.trainable = False
 
-    # === Print trainable status summary ===
     print("[DEBUG] Layer trainable status after unfreezing:")
     for layer in base_model.layers:
         print(f"{layer.name}: {layer.trainable}")
@@ -153,15 +158,21 @@ if base_model is not None:
         ]
     )
 
+    # === Progress Bar for Fine Tuning ===
     print("[INFO] Starting fine-tuning...")
-    history_fine = model.fit(
-        train_gen,
-        validation_data=val_gen,
-        epochs=EPOCHS_FINE,
-        callbacks=callbacks,
-        class_weight=class_weights,
-        verbose=1
-    )
+    pbar_fine = tqdm(total=EPOCHS_FINE, desc="Fine Tuning", file=sys.__stdout__)
+
+    for epoch in range(EPOCHS_FINE):
+        history_fine = model.fit(
+            train_gen,
+            validation_data=val_gen,
+            epochs=1,
+            callbacks=callbacks,
+            class_weight=class_weights,
+            verbose=1  # will print to log
+        )
+        pbar_fine.update(1)
+    pbar_fine.close()
 else:
     history_fine = None
 
@@ -170,18 +181,15 @@ print("[DEBUG] Plotting validation prediction probability distribution...")
 
 y_pred_prob = model.predict(val_gen).flatten()
 
-import matplotlib.pyplot as plt
 plt.figure(figsize=(8,6))
 plt.hist(y_pred_prob, bins=50)
 plt.title("Validation Prediction Probabilities")
 plt.xlabel("Predicted probability")
 plt.ylabel("Count")
 
-# === SAVE TO OUTPUT DIRECTORY ===
 hist_path = os.path.join(output_dir, "val_pred_prob_hist.png")
 plt.savefig(hist_path)
 plt.close()
-
 print(f"[DEBUG] Saved prediction probability histogram to {hist_path}")
 
 # === SAVE HISTORY ===
@@ -209,7 +217,6 @@ else:
     optimal_threshold = THRESHOLD
     print(f"[INFO] Using fixed threshold: {optimal_threshold:.4f}")
 
-# === SAVE THRESHOLD ===
 threshold_path = os.path.join(output_dir, "optimal_threshold_val.txt")
 with open(threshold_path, "w") as f:
     f.write(f"{optimal_threshold:.4f}\n")
@@ -219,4 +226,6 @@ elapsed_time = time.time() - start_time
 print(f"[INFO] Total training time: {int(elapsed_time // 60)}m {int(elapsed_time % 60)}s", file=sys.__stdout__)
 
 # === CLOSE LOG ===
+sys.stdout = sys.__stdout__
+sys.stderr = sys.__stderr__
 log_file.close()
