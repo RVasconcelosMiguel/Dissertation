@@ -15,12 +15,13 @@ from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLRO
 from model import build_model
 from data_loader import get_generators
 from plot_utils import plot_history
+from losses import focal_loss  # <=== IMPORT FOCAL LOSS
 
 # === CONFIGURATION ===
 model_name = "custom_cnn"
 IMG_SIZE = 128
 BATCH_SIZE = 32
-EPOCHS = 20  # Increased for proper convergence with adjusted learning rate
+EPOCHS = 20
 LEARNING_RATE = 1e-4
 DROPOUT = 0.4
 L2_REG = 1e-4
@@ -82,10 +83,10 @@ print(f"Class weights {class_weights}\n")
 model, base_model = build_model(model_name, img_size=IMG_SIZE, dropout=DROPOUT, l2_lambda=L2_REG)
 model.summary()
 
-# === COMPILE MODEL ===
+# === COMPILE MODEL WITH FOCAL LOSS ===
 model.compile(
     optimizer=Adam(learning_rate=LEARNING_RATE),
-    loss="binary_crossentropy",
+    loss=focal_loss(alpha=0.5, gamma=2.0),  # <=== FOCAL LOSS USED HERE
     metrics=[
         tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
         tf.keras.metrics.AUC(name="auc"),

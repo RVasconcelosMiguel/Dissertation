@@ -2,7 +2,7 @@
 import tensorflow as tf
 from tensorflow.keras import backend as K
 
-def focal_loss(alpha=0.5, gamma=1.0):
+def focal_loss(alpha=0.5, gamma=2.0):
     def focal_loss_fixed(y_true, y_pred):
         epsilon = K.epsilon()
         y_pred = K.clip(y_pred, epsilon, 1. - epsilon)
