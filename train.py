@@ -26,7 +26,7 @@ EPOCHS_HEAD = 5
 EPOCHS_FINE = 10
 
 LEARNING_RATE_HEAD = 1e-4
-LEARNING_RATE_FINE = 1e-6  # Increased for meaningful fine-tuning
+LEARNING_RATE_FINE = 1e-4  # Increased for meaningful fine-tuning
 
 DROPOUT = 0.3
 L2_REG = 0#1e-4
@@ -144,7 +144,7 @@ if base_model is not None:
 
     model.compile(
         optimizer=Adam(learning_rate=LEARNING_RATE_FINE),
-        loss=focal_loss(alpha=0.25, gamma=2.0),
+        loss="binary_crossentropy",
         metrics=[
             tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
             tf.keras.metrics.AUC(name="auc"),

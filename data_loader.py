@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.applications.efficientnet import preprocess_input
 
 # === BASE PATHS ===
 BASE_PATH = "/raid/DATASETS/rmiguel_datasets/ISIC16/Classification/Split"
@@ -10,37 +11,44 @@ val_folder = os.path.join(BASE_PATH, "val")
 test_folder = os.path.join(BASE_PATH, "test")
 
 # === LOAD CSV DATAFRAMES ===
-def load_dataframes(file_path):
-    df = pd.read_csv(os.path.join(BASE_PATH, file_path), header=None, names=['image', 'label'])
+def load_dataframes(csv_path):
+    df = pd.read_csv(csv_path, header=None, names=['image', 'label'])
     df['label'] = df['label'].astype(str)  # Convert labels to string for flow_from_dataframe compatibility
     return df
 
 # === DATA GENERATORS FUNCTION ===
 def get_generators(img_size, batch_size):
-
     # Load dataframes
     train_df = load_dataframes(os.path.join(train_folder, "train_labels.csv"))
     val_df = load_dataframes(os.path.join(val_folder, "val_labels.csv"))
     test_df = load_dataframes(os.path.join(test_folder, "test_labels.csv"))
 
-    # Define augmentation for training only
-    
+    # === Verify label distributions ===
+    print("Train label distribution:\n", train_df['label'].value_counts())
+    print("Val label distribution:\n", val_df['label'].value_counts())
+    print("Test label distribution:\n", test_df['label'].value_counts())
+
+    # === Print dataframe samples for path sanity check ===
+    print("[DEBUG] Sample train_df:")
+    print(train_df.head())
+
+    # === Define augmentation for training with EfficientNet preprocessing ===
     train_datagen = ImageDataGenerator(
-        rescale=1./255,
+        preprocessing_function=preprocess_input,
         rotation_range=20,
         width_shift_range=0.1,
         height_shift_range=0.1,
-        shear_range=10,             # Added shear augmentation
+        shear_range=10,
         zoom_range=0.1,
         horizontal_flip=True,
-        vertical_flip=True,         # Added vertical flip
+        vertical_flip=True,  # Consider disabling if vertical flips are not meaningful in your medical dataset
         fill_mode='nearest'
     )
 
-    # Define rescaling only for validation and test sets
-    test_val_datagen = ImageDataGenerator(rescale=1./255)
+    # === Define preprocessing only for validation and test sets ===
+    test_val_datagen = ImageDataGenerator(preprocessing_function=preprocess_input)
 
-    # Training generator
+    # === Training generator ===
     train_gen = train_datagen.flow_from_dataframe(
         dataframe=train_df,
         directory=train_folder,
@@ -53,7 +61,7 @@ def get_generators(img_size, batch_size):
         seed=42
     )
 
-    # Validation generator
+    # === Validation generator ===
     val_gen = test_val_datagen.flow_from_dataframe(
         dataframe=val_df,
         directory=val_folder,
@@ -65,7 +73,7 @@ def get_generators(img_size, batch_size):
         shuffle=False
     )
 
-    # Test generator
+    # === Test generator ===
     test_gen = test_val_datagen.flow_from_dataframe(
         dataframe=test_df,
         directory=test_folder,
@@ -78,3 +86,4 @@ def get_generators(img_size, batch_size):
     )
 
     return train_df, val_df, test_df, train_gen, val_gen, test_gen
+
