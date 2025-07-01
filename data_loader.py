@@ -24,13 +24,16 @@ def get_generators(img_size, batch_size):
     test_df = load_dataframes(os.path.join(test_folder, "test_labels.csv"))
 
     # Define augmentation for training only
+    
     train_datagen = ImageDataGenerator(
         rescale=1./255,
         rotation_range=20,
         width_shift_range=0.1,
         height_shift_range=0.1,
-        horizontal_flip=True,
+        shear_range=10,             # Added shear augmentation
         zoom_range=0.1,
+        horizontal_flip=True,
+        vertical_flip=True,         # Added vertical flip
         fill_mode='nearest'
     )
 
