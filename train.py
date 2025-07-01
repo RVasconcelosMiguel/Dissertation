@@ -202,7 +202,7 @@ if CALCULATE_OPTIMAL_THRESHOLD:
     youden_index = tpr - fpr
     optimal_idx = np.argmax(youden_index)
     optimal_threshold = thresholds[optimal_idx] if np.isfinite(thresholds[optimal_idx]) else 0.5
-    print(f"[INFO] Using optimal validation threshold (Youden's J): {optimal_threshold:.4f}")
+    print(f"[INFO] Using optimal validation threshold (Youden's J) : {optimal_threshold:.4f}")
 else:
     optimal_threshold = THRESHOLD
     print(f"[INFO] Using fixed threshold: {optimal_threshold:.4f}")
