@@ -3,27 +3,56 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import confusion_matrix, roc_curve, auc
 
+import os
+import matplotlib.pyplot as plt
+
 def plot_history(histories, save_path, metrics):
+    """
+    Plots and saves training history curves for specified metrics.
+
+    Args:
+        histories (dict): Dictionary containing 'head' and/or 'fine' training histories.
+        save_path (str): Directory to save plots.
+        metrics (list): List of metric names to plot.
+    """
     os.makedirs(save_path, exist_ok=True)
 
     for metric in metrics:
         plt.figure(figsize=(8, 5))
+        plotted_any = False  # Track if anything was plotted for this metric
+
         for name, hist in histories.items():
+            if not hist:
+                continue  # skip empty histories
+
+            # Support both Keras History objects and dicts
             history_dict = hist.history if hasattr(hist, "history") else hist
-            if metric in history_dict:
-                plt.plot(history_dict[metric], label=f"{name} - train")
-                val_metric = history_dict.get(f"val_{metric}", [])
-                if val_metric:
-                    plt.plot(val_metric, label=f"{name} - val")
-        plt.title(f"{metric.capitalize()} over Epochs")
-        plt.xlabel("Epoch")
-        plt.ylabel(metric.capitalize())
-        plt.legend()
-        plt.grid(True)
-        metric_filename = f"{metric}_curve.png"
-        metric_save_path = os.path.join(save_path, metric_filename)
-        plt.savefig(metric_save_path)
+
+            train_metric = history_dict.get(metric, [])
+            val_metric = history_dict.get(f"val_{metric}", [])
+
+            if train_metric:
+                plt.plot(train_metric, label=f"{name} - train")
+                plotted_any = True
+            if val_metric:
+                plt.plot(val_metric, label=f"{name} - val")
+                plotted_any = True
+
+        if plotted_any:
+            plt.title(f"{metric.capitalize()} over Epochs")
+            plt.xlabel("Epoch")
+            plt.ylabel(metric.capitalize())
+            plt.legend()
+            plt.grid(True)
+            metric_filename = f"{metric}_curve.png"
+            metric_save_path = os.path.join(save_path, metric_filename)
+            plt.savefig(metric_save_path)
+            print(f"[DEBUG] Saved {metric} plot to {metric_save_path}")
+        else:
+            print(f"[DEBUG] No data available for metric: {metric}")
+
         plt.close()
+
 
 def save_confusion_matrix(y_true, y_pred, labels, save_path):
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
