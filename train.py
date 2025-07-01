@@ -125,13 +125,17 @@ for epoch in range(EPOCHS):
         train_gen,
         validation_data=val_gen,
         epochs=1,
-        callbacks=callbacks,
+        callbacks=[RecallLogger()],
         class_weight=class_weights,
         verbose=0
     )
     for key in history.history:
-        history_all[key] += history.history[key]
+        if key in history_all:
+            history_all[key] += history.history[key]
+        else:
+            history_all[key] = history.history[key]
     pbar.update(1)
+
 pbar.close()
 
 # === SAVE HISTORY ===
