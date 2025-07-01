@@ -26,10 +26,10 @@ EPOCHS_HEAD = 5
 EPOCHS_FINE = 10
 
 LEARNING_RATE_HEAD = 1e-4
-LEARNING_RATE_FINE = 5e-5  # Increased for meaningful fine-tuning
+LEARNING_RATE_FINE = 1e-6  # Increased for meaningful fine-tuning
 
 DROPOUT = 0.3
-L2_REG = 1e-3
+L2_REG = 0#1e-4
 
 CALCULATE_OPTIMAL_THRESHOLD = True
 THRESHOLD = 0.5
@@ -111,7 +111,7 @@ if base_model is not None:
 
 model.compile(
     optimizer=Adam(learning_rate=LEARNING_RATE_HEAD),
-    loss=focal_loss(alpha=0.25, gamma=2.0),
+    loss="binary_crossentropy",
     metrics=[
         tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
         tf.keras.metrics.AUC(name="auc"),
@@ -164,6 +164,25 @@ if base_model is not None:
     )
 else:
     history_fine = None
+
+# === CHECK PREDICTION DISTRIBUTION BEFORE THRESHOLDING ===
+print("[DEBUG] Plotting validation prediction probability distribution...")
+
+y_pred_prob = model.predict(val_gen).flatten()
+
+import matplotlib.pyplot as plt
+plt.figure(figsize=(8,6))
+plt.hist(y_pred_prob, bins=50)
+plt.title("Validation Prediction Probabilities")
+plt.xlabel("Predicted probability")
+plt.ylabel("Count")
+
+# === SAVE TO OUTPUT DIRECTORY ===
+hist_path = os.path.join(output_dir, "val_pred_prob_hist.png")
+plt.savefig(hist_path)
+plt.close()
+
+print(f"[DEBUG] Saved prediction probability histogram to {hist_path}")
 
 # === SAVE HISTORY ===
 history_all = {

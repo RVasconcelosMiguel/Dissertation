@@ -24,7 +24,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 logging.getLogger('tensorflow').setLevel(logging.ERROR)
 warnings.filterwarnings("ignore", category=FutureWarning)
 
-# === Redirect stdout and stderr ===
+# === Redirect stdout and stderr to log ===
 log_file = open(log_file_path, "w")
 sys.stdout = log_file
 sys.stderr = log_file
@@ -35,6 +35,7 @@ print(f"[INFO] Evaluation started at: {start_time.isoformat()}")
 # === Imports ===
 import tensorflow as tf
 import numpy as np
+import matplotlib.pyplot as plt
 from sklearn.metrics import classification_report, roc_auc_score
 
 from model import build_model
@@ -78,7 +79,7 @@ model.compile(
     metrics=thresholded_metrics
 )
 
-# === Evaluate on Test Set (applying threshold from validation) ===
+# === Evaluate on Test Set ===
 print("[INFO] Evaluating on test set (no further training)...")
 results = model.evaluate(test_gen, verbose=1)
 for name, val in zip(model.metrics_names, results):
@@ -94,6 +95,18 @@ save_roc_curve(y_true, y_prob, roc_curve_path)
 roc_auc = roc_auc_score(y_true, y_prob)
 print(f"[INFO] ROC curve saved to {roc_curve_path}")
 print(f"[INFO] Test ROC AUC: {roc_auc:.4f}")
+
+# === Save prediction probability histogram ===
+print("[INFO] Saving test prediction probability histogram...")
+plt.figure(figsize=(8,6))
+plt.hist(y_prob, bins=50, color='skyblue', edgecolor='black')
+plt.title("Test Prediction Probabilities")
+plt.xlabel("Predicted probability")
+plt.ylabel("Count")
+hist_path = os.path.join(output_dir, "test_pred_prob_hist.png")
+plt.savefig(hist_path)
+plt.close()
+print(f"[INFO] Histogram saved to {hist_path}")
 
 # === Threshold-based Predictions and Classification Report ===
 print("[INFO] Generating test predictions with loaded threshold...")
