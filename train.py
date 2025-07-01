@@ -126,11 +126,13 @@ history_head = model.fit(
 )
 
 # === FINE-TUNING ===
+# Unfreeze the last abs(FINE_TUNE_AT) layers for fine-tuning
 if base_model is not None:
     print(f"[INFO] Unfreezing last {abs(FINE_TUNE_AT)} layers for fine-tuning.")
-    base_model.trainable = True
+    base_model.trainable = True  # Allow the entire base model to be trainable
     for layer in base_model.layers[:FINE_TUNE_AT]:
-        layer.trainable = False
+        layer.trainable = False  # Re-freeze earlier layers to avoid overfitting and speed up training
+
 
     model.compile(
         optimizer=Adam(learning_rate=LEARNING_RATE_FINE),
