@@ -20,7 +20,7 @@ from plot_utils import plot_history
 model_name = "custom_cnn"
 IMG_SIZE = 128
 BATCH_SIZE = 32
-EPOCHS = 50
+EPOCHS = 5
 LEARNING_RATE = 1e-3
 
 DROPOUT = 0.2
