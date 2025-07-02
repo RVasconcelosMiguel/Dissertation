@@ -6,27 +6,43 @@ from sklearn.metrics import confusion_matrix, roc_curve, auc
 import os
 import matplotlib.pyplot as plt
 
+import os
+import matplotlib.pyplot as plt
+
 def plot_history(histories, save_path, metrics):
+    """
+    Plot training and validation metrics for all training phases.
+
+    Args:
+        histories (dict): Dictionary containing histories per training phase.
+        save_path (str): Directory path to save plots.
+        metrics (list): List of metric names to plot.
+    """
     os.makedirs(save_path, exist_ok=True)
 
     for metric in metrics:
         plt.figure(figsize=(8, 5))
         plotted_any = False
 
-        for name, hist in histories.items():
+        # Loop through each phase history: head, fine, fine_2
+        for phase_name, hist in histories.items():
             if not hist:
                 continue
 
+            # Determine if hist is a History object or dict
             history_dict = hist.history if hasattr(hist, "history") else hist
 
             train_metric = history_dict.get(metric, [])
             val_metric = history_dict.get(f"val_{metric}", [])
 
+            # Plot training metric
             if train_metric:
-                plt.plot(train_metric, label=f"{name} - train")
+                plt.plot(range(len(train_metric)), train_metric, label=f"{phase_name} - train")
                 plotted_any = True
+
+            # Plot validation metric
             if val_metric:
-                plt.plot(val_metric, label=f"{name} - val")
+                plt.plot(range(len(val_metric)), val_metric, label=f"{phase_name} - val")
                 plotted_any = True
 
         if plotted_any:
@@ -35,6 +51,8 @@ def plot_history(histories, save_path, metrics):
             plt.ylabel(metric.capitalize())
             plt.legend()
             plt.grid(True)
+
+            # Save plot
             metric_filename = f"{metric}_curve.png"
             metric_save_path = os.path.join(save_path, metric_filename)
             plt.savefig(metric_save_path)
@@ -43,6 +61,7 @@ def plot_history(histories, save_path, metrics):
             print(f"[DEBUG] No data available for metric: {metric}")
 
         plt.close()
+
 
 
 def save_confusion_matrix(y_true, y_pred, labels, save_path):
