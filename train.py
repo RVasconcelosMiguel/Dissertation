@@ -22,19 +22,22 @@ model_name = "efficientnetb1"
 IMG_SIZE = 240
 BATCH_SIZE = 64
 
-EPOCHS_HEAD = 10
+EPOCHS_HEAD = 5
 EPOCHS_FINE = 20
+EPOCHS_FINE_2 = 10
 
 LEARNING_RATE_HEAD = 1e-3
 LEARNING_RATE_FINE = 5e-5
+LEARNING_RATE_FINE_2 = 1e-6
 
-DROPOUT = 0.5
-L2_REG = 1e-4
+DROPOUT = 0.4
+L2_REG = 1e-3
 
 CALCULATE_OPTIMAL_THRESHOLD = True
 THRESHOLD = 0.5
 
 FINE_TUNE_AT = -20
+FINE_TUNE_AT_2 = -50
 
 # === PATHS ===
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}"
@@ -87,11 +90,6 @@ print_distribution("Test", test_df)
 class_weights = compute_class_weights(train_df)
 print(f"Class weights {class_weights}\n")
 
-# === Verify data pipeline sample ===
-print("[DEBUG] Displaying a sample training batch labels:")
-x_batch, y_batch = next(train_gen)
-print("Labels sample:", y_batch[:10])
-
 # === MODEL CONSTRUCTION ===
 model, base_model = build_model(model_name, img_size=IMG_SIZE, dropout=DROPOUT, l2_lambda=L2_REG)
 model.summary()
@@ -120,7 +118,6 @@ model.compile(
     ]
 )
 
-# === Train head in a single fit call ===
 print("[INFO] Starting head training...")
 history_head = model.fit(
     train_gen,
@@ -131,16 +128,12 @@ history_head = model.fit(
     verbose=1
 )
 
-# === FINE-TUNING ===
+# === FINE-TUNING PHASE 1 ===
 if base_model is not None:
-    print(f"[INFO] Unfreezing last {abs(FINE_TUNE_AT)} layers for fine-tuning.")
+    print(f"[INFO] Unfreezing last {abs(FINE_TUNE_AT)} layers for fine-tuning stage 1.")
     base_model.trainable = True
     for layer in base_model.layers[:FINE_TUNE_AT]:
         layer.trainable = False
-
-    print("[DEBUG] Layer trainable status after unfreezing:")
-    for layer in base_model.layers:
-        print(f"{layer.name}: {layer.trainable}")
 
     model.compile(
         optimizer=Adam(learning_rate=LEARNING_RATE_FINE),
@@ -153,8 +146,7 @@ if base_model is not None:
         ]
     )
 
-    # === Train fine-tuning in a single fit call ===
-    print("[INFO] Starting fine-tuning...")
+    print("[INFO] Starting fine-tuning stage 1...")
     history_fine = model.fit(
         train_gen,
         validation_data=val_gen,
@@ -166,26 +158,42 @@ if base_model is not None:
 else:
     history_fine = None
 
-# === CHECK PREDICTION DISTRIBUTION BEFORE THRESHOLDING ===
-print("[DEBUG] Plotting validation prediction probability distribution...")
+# === FINE-TUNING PHASE 2 ===
+if base_model is not None:
+    print(f"[INFO] Unfreezing last {abs(FINE_TUNE_AT_2)} layers for fine-tuning stage 2.")
+    for layer in base_model.layers[:FINE_TUNE_AT_2]:
+        layer.trainable = False
+    for layer in base_model.layers[FINE_TUNE_AT_2:]:
+        layer.trainable = True
 
-y_pred_prob = model.predict(val_gen).flatten()
+    model.compile(
+        optimizer=Adam(learning_rate=LEARNING_RATE_FINE_2),
+        loss="binary_crossentropy",
+        metrics=[
+            tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
+            tf.keras.metrics.AUC(name="auc"),
+            tf.keras.metrics.Precision(name="precision", thresholds=THRESHOLD),
+            tf.keras.metrics.Recall(name="recall", thresholds=THRESHOLD),
+        ]
+    )
 
-plt.figure(figsize=(8,6))
-plt.hist(y_pred_prob, bins=50)
-plt.title("Validation Prediction Probabilities")
-plt.xlabel("Predicted probability")
-plt.ylabel("Count")
-
-hist_path = os.path.join(output_dir, "val_pred_prob_hist.png")
-plt.savefig(hist_path)
-plt.close()
-print(f"[DEBUG] Saved prediction probability histogram to {hist_path}")
+    print("[INFO] Starting fine-tuning stage 2...")
+    history_fine_2 = model.fit(
+        train_gen,
+        validation_data=val_gen,
+        epochs=EPOCHS_FINE_2,
+        callbacks=callbacks,
+        class_weight=class_weights,
+        verbose=1
+    )
+else:
+    history_fine_2 = None
 
 # === SAVE HISTORY ===
 history_all = {
     'head': history_head.history,
-    'fine': history_fine.history if history_fine else {}
+    'fine': history_fine.history if history_fine else {},
+    'fine_2': history_fine_2.history if history_fine_2 else {}
 }
 save_history(history_all, f"models/history_{model_name}.pkl")
 
@@ -214,8 +222,6 @@ with open(threshold_path, "w") as f:
 # === TRAINING TIME ===
 elapsed_time = time.time() - start_time
 print(f"[INFO] Total training time: {int(elapsed_time // 60)}m {int(elapsed_time % 60)}s", file=sys.__stdout__)
-
-print(history_head.history)
 
 # === CLOSE LOG ===
 sys.stdout = sys.__stdout__
