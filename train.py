@@ -144,7 +144,7 @@ if base_model is not None:
 
     model.compile(
         optimizer=Adam(learning_rate=LEARNING_RATE_FINE),
-        loss=focal_loss(gamma=2.0, alpha=0.25),
+        loss="binary_crossentropy",
         metrics=[
             tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
             tf.keras.metrics.AUC(name="auc"),
