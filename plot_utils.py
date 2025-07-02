@@ -15,7 +15,7 @@ def plot_history(histories, save_path, metrics):
     """
     os.makedirs(save_path, exist_ok=True)
 
-    phases = ["head", "fine", "fine_2", "fine_3"]
+    phases = ["head", "fine_1", "fine_2", "fine_3"]
 
     for metric in metrics:
         plt.figure(figsize=(16, 10))

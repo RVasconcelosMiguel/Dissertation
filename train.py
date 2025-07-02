@@ -22,12 +22,12 @@ IMG_SIZE = 240
 BATCH_SIZE = 16
 
 EPOCHS_HEAD = 10
-EPOCHS_FINE = 10
+EPOCHS_FINE_1 = 10
 EPOCHS_FINE_2 = 10
 EPOCHS_FINE_3 = 10
 
 LEARNING_RATE_HEAD = 1e-4
-LEARNING_RATE_FINE = 1e-5
+LEARNING_RATE_FINE_1 = 1e-5
 LEARNING_RATE_FINE_2 = 5e-6
 LEARNING_RATE_FINE_3 = 1e-6
 
@@ -119,8 +119,8 @@ history_head = model.fit(
 
 # === GRADUAL FINE-TUNING ===
 fine_histories = {}
-learning_rates = [LEARNING_RATE_FINE, LEARNING_RATE_FINE_2, LEARNING_RATE_FINE_3]
-epochs_list = [EPOCHS_FINE, EPOCHS_FINE_2, EPOCHS_FINE_3]
+learning_rates = [LEARNING_RATE_FINE_1, LEARNING_RATE_FINE_2, LEARNING_RATE_FINE_3]
+epochs_list = [EPOCHS_FINE_1, EPOCHS_FINE_2, EPOCHS_FINE_3]
 
 for idx, fine_tune_at in enumerate(FINE_TUNE_STEPS):
     print(f"[INFO] Unfreezing last {abs(fine_tune_at)} layers for fine-tuning stage {idx+1}.")
