@@ -3,15 +3,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import confusion_matrix, roc_curve, auc
 
-import os
-import matplotlib.pyplot as plt
-
-import os
-import matplotlib.pyplot as plt
 
 def plot_history(histories, save_path, metrics):
     """
-    Plot training and validation metrics for all training phases.
+    Plot training and validation metrics in one figure per metric with subplots for each phase.
 
     Args:
         histories (dict): Dictionary containing histories per training phase.
@@ -20,47 +15,46 @@ def plot_history(histories, save_path, metrics):
     """
     os.makedirs(save_path, exist_ok=True)
 
+    phases = ["head", "fine", "fine_2", "fine_3"]
+
     for metric in metrics:
-        plt.figure(figsize=(8, 5))
+        plt.figure(figsize=(16, 10))
         plotted_any = False
 
-        # Loop through each phase history: head, fine, fine_2
-        for phase_name, hist in histories.items():
+        for i, phase_name in enumerate(phases):
+            hist = histories.get(phase_name, {})
             if not hist:
                 continue
 
-            # Determine if hist is a History object or dict
             history_dict = hist.history if hasattr(hist, "history") else hist
 
             train_metric = history_dict.get(metric, [])
             val_metric = history_dict.get(f"val_{metric}", [])
 
-            # Plot training metric
-            if train_metric:
-                plt.plot(range(len(train_metric)), train_metric, label=f"{phase_name} - train")
+            if train_metric or val_metric:
                 plotted_any = True
-
-            # Plot validation metric
-            if val_metric:
-                plt.plot(range(len(val_metric)), val_metric, label=f"{phase_name} - val")
-                plotted_any = True
+                plt.subplot(2, 2, i+1)
+                if train_metric:
+                    plt.plot(range(len(train_metric)), train_metric, label="train")
+                if val_metric:
+                    plt.plot(range(len(val_metric)), val_metric, label="val")
+                plt.title(f"{phase_name.capitalize()} {metric.capitalize()}")
+                plt.xlabel("Epoch")
+                plt.ylabel(metric.capitalize())
+                plt.legend()
+                plt.grid(True)
 
         if plotted_any:
-            plt.title(f"{metric.capitalize()} over Epochs")
-            plt.xlabel("Epoch")
-            plt.ylabel(metric.capitalize())
-            plt.legend()
-            plt.grid(True)
-
-            # Save plot
-            metric_filename = f"{metric}_curve.png"
+            plt.tight_layout()
+            metric_filename = f"{metric}_all_phases.png"
             metric_save_path = os.path.join(save_path, metric_filename)
             plt.savefig(metric_save_path)
-            print(f"[DEBUG] Saved {metric} plot to {metric_save_path}")
+            print(f"[DEBUG] Saved {metric} plot with all phases to {metric_save_path}")
         else:
             print(f"[DEBUG] No data available for metric: {metric}")
 
         plt.close()
+
 
 
 
