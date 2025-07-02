@@ -46,7 +46,7 @@ def plot_history(histories, save_path, metrics):
 
         if plotted_any:
             plt.tight_layout()
-            metric_filename = f"{metric}_all_phases.png"
+            metric_filename = f"{metric}_curve.png"
             metric_save_path = os.path.join(save_path, metric_filename)
             plt.savefig(metric_save_path)
             print(f"[DEBUG] Saved {metric} plot with all phases to {metric_save_path}")
