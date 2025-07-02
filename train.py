@@ -22,19 +22,19 @@ model_name = "efficientnetb1"
 IMG_SIZE = 240
 BATCH_SIZE = 64
 
-EPOCHS_HEAD = 15
-EPOCHS_FINE = 50
+EPOCHS_HEAD = 10
+EPOCHS_FINE = 20
 
-LEARNING_RATE_HEAD = 1e-4
+LEARNING_RATE_HEAD = 1e-3
 LEARNING_RATE_FINE = 1e-4
 
-DROPOUT = 0.4
-L2_REG = 1e-4
+DROPOUT = 0.3
+L2_REG = 1e-5
 
 CALCULATE_OPTIMAL_THRESHOLD = True
 THRESHOLD = 0.5
 
-FINE_TUNE_AT = -100
+FINE_TUNE_AT = -30
 
 # === PATHS ===
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}"
@@ -111,7 +111,7 @@ if base_model is not None:
 
 model.compile(
     optimizer=Adam(learning_rate=LEARNING_RATE_HEAD),
-    loss="binary_crossentropy",
+    loss=focal_loss(gamma=2.0, alpha=0.25),
     metrics=[
         tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
         tf.keras.metrics.AUC(name="auc"),
@@ -144,7 +144,7 @@ if base_model is not None:
 
     model.compile(
         optimizer=Adam(learning_rate=LEARNING_RATE_FINE),
-        loss="binary_crossentropy",
+        loss=focal_loss(gamma=2.0, alpha=0.25),
         metrics=[
             tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
             tf.keras.metrics.AUC(name="auc"),
