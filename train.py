@@ -23,18 +23,18 @@ IMG_SIZE = 240
 BATCH_SIZE = 64
 
 EPOCHS_HEAD = 10
-EPOCHS_FINE = 15
+EPOCHS_FINE = 20
 
 LEARNING_RATE_HEAD = 1e-3
-LEARNING_RATE_FINE = 1e-4
+LEARNING_RATE_FINE = 5e-5
 
 DROPOUT = 0.5
-L2_REG = 1e-3
+L2_REG = 1e-4
 
 CALCULATE_OPTIMAL_THRESHOLD = True
 THRESHOLD = 0.5
 
-FINE_TUNE_AT = -30
+FINE_TUNE_AT = -20
 
 # === PATHS ===
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}"
