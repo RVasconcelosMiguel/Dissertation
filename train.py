@@ -26,16 +26,19 @@ EPOCHS_FINE_1 = 0#15
 EPOCHS_FINE_2 = 0#15
 EPOCHS_FINE_3 = 0#15
 
-LEARNING_RATE_HEAD = 5e-4
+LEARNING_RATE_HEAD = 1e-4
 LEARNING_RATE_FINE_1 = 1e-5
 LEARNING_RATE_FINE_2 = 5e-6
 LEARNING_RATE_FINE_3 = 1e-6
 
-DROPOUT = 0.2
+DROPOUT = 0.4
 L2_REG = 1e-5
 
 CALCULATE_OPTIMAL_THRESHOLD = True
 THRESHOLD = 0.5
+
+gamma=2
+alpha=0.4
 
 FINE_TUNE_STEPS = [-10, -20, -40]  # Gradual unfreezing points
 
@@ -103,7 +106,7 @@ base_model.trainable = False
 print("[INFO] Base model frozen for head training.")
 model.compile(
     optimizer=Adam(learning_rate=LEARNING_RATE_HEAD),
-    loss=focal_loss(gamma=2.0, alpha=0.25),
+    loss=focal_loss(gamma, alpha),
     metrics=[
         tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
         tf.keras.metrics.AUC(name="auc"),
