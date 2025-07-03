@@ -21,8 +21,8 @@ model_name = "efficientnetb1"
 IMG_SIZE = 240
 BATCH_SIZE = 16
 
-EPOCHS_HEAD = 20
-EPOCHS_FINE_1 = 0#15
+EPOCHS_HEAD = 0#25
+EPOCHS_FINE_1 = 20
 EPOCHS_FINE_2 = 0#15
 EPOCHS_FINE_3 = 0#15
 
@@ -40,7 +40,7 @@ THRESHOLD = 0.5
 gamma=2
 alpha=0.4
 
-FINE_TUNE_STEPS = [-10, -20, -40]  # Gradual unfreezing points
+FINE_TUNE_STEPS = [-100, -20, -40]  # Gradual unfreezing points
 
 # === PATHS ===
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}"
@@ -122,8 +122,8 @@ history_head = model.fit(
 
 # === GRADUAL FINE-TUNING ===
 fine_histories = {}
-learning_rates = [LEARNING_RATE_FINE_1, LEARNING_RATE_FINE_2, LEARNING_RATE_FINE_3]
-epochs_list = [EPOCHS_FINE_1, EPOCHS_FINE_2, EPOCHS_FINE_3]
+learning_rates = [LEARNING_RATE_FINE_1]#, LEARNING_RATE_FINE_2, LEARNING_RATE_FINE_3]
+epochs_list = [EPOCHS_FINE_1]#, EPOCHS_FINE_2, EPOCHS_FINE_3]
 
 for idx, fine_tune_at in enumerate(FINE_TUNE_STEPS):
     print(f"[INFO] Unfreezing last {abs(fine_tune_at)} layers for fine-tuning stage {idx+1}.")
