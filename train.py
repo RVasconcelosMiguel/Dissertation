@@ -122,8 +122,8 @@ history_head = model.fit(
 
 # === GRADUAL FINE-TUNING ===
 fine_histories = {}
-learning_rates = [LEARNING_RATE_FINE_1]#, LEARNING_RATE_FINE_2, LEARNING_RATE_FINE_3]
-epochs_list = [EPOCHS_FINE_1]#, EPOCHS_FINE_2, EPOCHS_FINE_3]
+learning_rates = [LEARNING_RATE_FINE_1, LEARNING_RATE_FINE_2, LEARNING_RATE_FINE_3]
+epochs_list = [EPOCHS_FINE_1, EPOCHS_FINE_2, EPOCHS_FINE_3]
 
 for idx, fine_tune_at in enumerate(FINE_TUNE_STEPS):
     print(f"[INFO] Unfreezing last {abs(fine_tune_at)} layers for fine-tuning stage {idx+1}.")
