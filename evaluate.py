@@ -7,8 +7,8 @@ from datetime import datetime
 
 # === CONFIGURATION ===
 model_name = "efficientnetb1"
-IMG_SIZE = 128 #240
-BATCH_SIZE = 16
+IMG_SIZE = 240 #240
+BATCH_SIZE = 32
 
 # === Paths ===
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}"

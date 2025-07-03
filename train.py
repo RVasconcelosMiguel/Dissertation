@@ -18,18 +18,18 @@ from losses import focal_loss
 
 # === CONFIGURATION ===
 model_name = "efficientnetb1"
-IMG_SIZE = 128  #240
-BATCH_SIZE = 16
+IMG_SIZE = 240  #240
+BATCH_SIZE = 32
 
-EPOCHS_HEAD = 20#25
-EPOCHS_FINE_1 = 1
-EPOCHS_FINE_2 = 1#15
-EPOCHS_FINE_3 = 1#15
+EPOCHS_HEAD = 20
+EPOCHS_FINE_1 = 15
+EPOCHS_FINE_2 = 10
+EPOCHS_FINE_3 = 5
 
 LEARNING_RATE_HEAD = 1e-3
-LEARNING_RATE_FINE_1 = 1e-6
-LEARNING_RATE_FINE_2 = 5e-7
-LEARNING_RATE_FINE_3 = 1e-7
+LEARNING_RATE_FINE_1 = 2e-4
+LEARNING_RATE_FINE_2 = 4e-5
+LEARNING_RATE_FINE_3 = 8e-6
 
 DROPOUT = 0.5
 L2_REG = 1e-4
@@ -40,7 +40,7 @@ THRESHOLD = 0.5
 gamma=2
 alpha=0.4
 
-FINE_TUNE_STEPS = [-10, -20, -40]  # Gradual unfreezing points
+FINE_TUNE_STEPS = [-20, -80, -230]  # Gradual unfreezing points
 
 # === PATHS ===
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}"
@@ -95,7 +95,7 @@ model.summary()
 
 # === CALLBACKS ===
 callbacks = [
-    EarlyStopping(monitor="val_auc", mode="max", patience=100, restore_best_weights=True),
+    EarlyStopping(monitor="val_auc", mode="max", patience=10, restore_best_weights=True),
     ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
     ReduceLROnPlateau(monitor="val_auc", mode="max", factor=0.5, patience=5, min_lr=1e-7, verbose=1),
     RecallLogger()

@@ -57,7 +57,7 @@ def get_generators(img_size, batch_size):
         y_col="label",
         target_size=(img_size, img_size),
         class_mode="binary",
-        batch_size=batch_size,
+        batch_size=128,
         shuffle=True,
         seed=42
     )
@@ -70,7 +70,7 @@ def get_generators(img_size, batch_size):
         y_col="label",
         target_size=(img_size, img_size),
         class_mode="binary",
-        batch_size=batch_size,
+        batch_size=128,
         shuffle=False
     )
 
