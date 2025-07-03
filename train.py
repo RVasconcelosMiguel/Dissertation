@@ -21,15 +21,15 @@ model_name = "efficientnetb1"
 IMG_SIZE = 128  #240
 BATCH_SIZE = 16
 
-EPOCHS_HEAD = 10#25
-EPOCHS_FINE_1 = 20
-EPOCHS_FINE_2 = 1#15
-EPOCHS_FINE_3 = 1#15
+EPOCHS_HEAD = 3#25
+EPOCHS_FINE_1 = 3
+EPOCHS_FINE_2 = 3#15
+EPOCHS_FINE_3 = 3#15
 
 LEARNING_RATE_HEAD = 1e-4
 LEARNING_RATE_FINE_1 = 1e-6
-LEARNING_RATE_FINE_2 = 5e-6
-LEARNING_RATE_FINE_3 = 1e-6
+LEARNING_RATE_FINE_2 = 5e-7
+LEARNING_RATE_FINE_3 = 1e-7
 
 DROPOUT = 0.4
 L2_REG = 1e-5
@@ -40,7 +40,7 @@ THRESHOLD = 0.5
 gamma=2
 alpha=0.4
 
-FINE_TUNE_STEPS = [-50, -20, -40]  # Gradual unfreezing points
+FINE_TUNE_STEPS = [-10, -20, -40]  # Gradual unfreezing points
 
 # === PATHS ===
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}"
