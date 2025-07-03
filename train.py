@@ -27,9 +27,9 @@ EPOCHS_FINE_2 = 10
 EPOCHS_FINE_3 = 5
 
 LEARNING_RATE_HEAD = 1e-3
-LEARNING_RATE_FINE_1 = 2e-4
-LEARNING_RATE_FINE_2 = 4e-5
-LEARNING_RATE_FINE_3 = 8e-6
+LEARNING_RATE_FINE_1 = 1e-5
+LEARNING_RATE_FINE_2 = 1e-6
+LEARNING_RATE_FINE_3 = 1e-7
 
 DROPOUT = 0.5
 L2_REG = 1e-4
@@ -40,7 +40,7 @@ THRESHOLD = 0.5
 gamma=2
 alpha=0.4
 
-FINE_TUNE_STEPS = [-20, -80, -230]  # Gradual unfreezing points
+FINE_TUNE_STEPS = [-10, -20, -30]  # Gradual unfreezing points
 
 # === PATHS ===
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}"
@@ -130,6 +130,11 @@ for idx, fine_tune_at in enumerate(FINE_TUNE_STEPS):
     base_model.trainable = True
     for layer in base_model.layers[:fine_tune_at]:
         layer.trainable = False
+
+    # Freeze BatchNorm layers
+    for layer in base_model.layers:
+        if isinstance(layer, tf.keras.layers.BatchNormalization):
+            layer.trainable = False
 
     model.compile(
         optimizer=Adam(learning_rate=learning_rates[idx]),
