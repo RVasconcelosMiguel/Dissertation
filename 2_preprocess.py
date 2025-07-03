@@ -4,6 +4,9 @@ import shutil
 from PIL import Image, ImageFilter, ImageChops
 from tqdm import tqdm
 
+# === CONFIGURATION ===
+use_binary_mask = True  # Set to False to disable mask application
+
 # === Folders ===
 input_folders = {
     'train': '/raid/DATASETS/rmiguel_datasets/ISIC16/Training_Data',
@@ -12,6 +15,10 @@ input_folders = {
 output_folders = {
     'train': '/raid/DATASETS/rmiguel_datasets/ISIC16/Classification/Preprocessed_Training_Data',
     'test': '/raid/DATASETS/rmiguel_datasets/ISIC16/Classification/Preprocessed_Testing_Data'
+}
+mask_folders = {
+    'train': '/raid/DATASETS/rmiguel_datasets/ISIC16/Training_GroundTruth',
+    'test': '/raid/DATASETS/rmiguel_datasets/ISIC16/Testing_GroundTruth'
 }
 
 # === Preprocessing Steps ===
@@ -47,6 +54,7 @@ def sharpen_channel_pil(channel, blur_radius=2, scale=0.5):
 for key in input_folders:
     original_folder = input_folders[key]
     processed_folder = output_folders[key]
+    mask_folder = mask_folders[key]
 
     # Safety: prevent accidental deletion of important paths
     assert "rmiguel_datasets" in processed_folder, "Unsafe output path! Aborting."
@@ -71,12 +79,32 @@ for key in input_folders:
 
         img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
 
-        # Preprocessing pipeline
+        # === Apply mask if configured ===
+        if use_binary_mask:
+            mask_name = image_name.replace('.jpg', '_Segmentation.png')
+            mask_path = os.path.join(mask_folder, mask_name)
+
+            if os.path.exists(mask_path):
+                mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
+                if mask is not None:
+                    # Ensure mask is binary (0 or 255)
+                    _, mask_bin = cv2.threshold(mask, 127, 255, cv2.THRESH_BINARY)
+                    # Resize mask to image size if needed
+                    if mask_bin.shape != img_rgb.shape[:2]:
+                        mask_bin = cv2.resize(mask_bin, (img_rgb.shape[1], img_rgb.shape[0]), interpolation=cv2.INTER_NEAREST)
+                    # Apply mask
+                    img_rgb = cv2.bitwise_and(img_rgb, img_rgb, mask=mask_bin)
+                else:
+                    print(f"Mask could not be loaded for: {image_name}")
+            else:
+                print(f"Mask not found for: {image_name}")
+
+        # === Preprocessing pipeline ===
         img_rgb = remove_hairs(img_rgb)
         # img_rgb = apply_clahe_rgb(img_rgb)             # Optional
         # img_rgb = normalize_illumination(img_rgb)      # Optional
 
-        # Channel sharpening
+        # === Channel sharpening ===
         img_pil = Image.fromarray(img_rgb)
         r, g, b = img_pil.split()
         r = sharpen_channel_pil(r)
@@ -84,9 +112,7 @@ for key in input_folders:
         b = sharpen_channel_pil(b)
         img_sharp = Image.merge('RGB', (r, g, b))
 
-        # Resize and save
-        #img_resized = img_sharp.resize((260, 260), Image.BICUBIC)
-
+        # === Save processed image ===
         img_sharp.save(processed_path)
 
     print(f"{key.upper()}: {len(all_images)} images processed.")
