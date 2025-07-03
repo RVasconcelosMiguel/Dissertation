@@ -18,10 +18,10 @@ from losses import focal_loss
 
 # === CONFIGURATION ===
 model_name = "efficientnetb1"
-IMG_SIZE = 240
+IMG_SIZE = 128  #240
 BATCH_SIZE = 16
 
-EPOCHS_HEAD = 1#25
+EPOCHS_HEAD = 10#25
 EPOCHS_FINE_1 = 20
 EPOCHS_FINE_2 = 0#15
 EPOCHS_FINE_3 = 0#15
