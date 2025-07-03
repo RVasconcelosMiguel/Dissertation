@@ -138,7 +138,7 @@ for idx, fine_tune_at in enumerate(FINE_TUNE_STEPS):
 
     model.compile(
         optimizer=Adam(learning_rate=learning_rates[idx]),
-        loss=focal_loss(gamma=2.0, alpha=0.25),
+        loss=focal_loss(gamma, alpha),
         metrics=[
             tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
             tf.keras.metrics.AUC(name="auc"),
