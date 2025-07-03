@@ -8,10 +8,10 @@ conda activate rm_dermo_env
 
 #Initialization
 echo "=== Preprocess ==="
-python 2_preprocess.py
+#python 2_preprocess.py
 
 echo "=== Augmentation ==="
-python 3_augmentation.py
+#python 3_augmentation.py
 
 
 
