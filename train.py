@@ -1,13 +1,10 @@
 import os
-import sys
 import pickle
 import numpy as np
 import tensorflow as tf
 import time
-import logging
 from sklearn.metrics import roc_curve
 from sklearn.utils.class_weight import compute_class_weight
-import matplotlib.pyplot as plt
 
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau, Callback
@@ -44,40 +41,28 @@ os.makedirs(output_dir, exist_ok=True)
 MODEL_PATH = f"models/{model_name}_weights"
 os.makedirs("models", exist_ok=True)
 
-# === LOGGING SETUP ===
-log_path = os.path.join(output_dir, "train_log.txt")
-logger = logging.getLogger('train_logger')
-logger.setLevel(logging.INFO)
+# === ENVIRONMENT SETUP ===
+start_time = time.time()
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
-file_handler = logging.FileHandler(log_path)
-file_handler.setLevel(logging.INFO)
-console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.INFO)
-
-formatter = logging.Formatter('%(asctime)s - %(message)s')
-file_handler.setFormatter(formatter)
-console_handler.setFormatter(formatter)
-
-logger.addHandler(file_handler)
-logger.addHandler(console_handler)
-
-logger.info("TensorFlow version: %s", tf.__version__)
-logger.info("GPU available: %s", tf.config.list_physical_devices('GPU'))
+print("TensorFlow version:", tf.__version__)
+print("GPU available:", tf.config.list_physical_devices('GPU'))
 
 # === HELPER FUNCTIONS ===
 def print_distribution(name, df):
     counts = df['label'].astype(int).value_counts().sort_index()
-    logger.info("[%s] Class 0: %d | Class 1: %d", name, counts.get(0, 0), counts.get(1, 0))
+    print(f"[{name}] Class 0: {counts.get(0, 0)} | Class 1: {counts.get(1, 0)}")
 
 def save_history(history, filename):
     with open(filename, "wb") as f:
         pickle.dump(history, f)
-    logger.info("[DEBUG] History saved to %s", filename)
+    print(f"[DEBUG] History saved to {filename}")
 
 class RecallLogger(Callback):
     def on_epoch_end(self, epoch, logs=None):
         recall = logs.get("val_recall")
-        logger.info("[Epoch %d] val_recall: %.4f", epoch+1, recall)
+        print(f"[Epoch {epoch+1}] val_recall: {recall:.4f}")
 
 def compute_class_weights(df):
     labels = df['label'].astype(int)
@@ -85,25 +70,19 @@ def compute_class_weights(df):
     weights = compute_class_weight('balanced', classes=classes, y=labels)
     return dict(zip(classes, weights))
 
-# === ENVIRONMENT SETUP ===
-start_time = time.time()
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-
 # === DATA LOADING ===
 train_df, val_df, test_df, train_gen, val_gen, test_gen = get_generators(IMG_SIZE, BATCH_SIZE)
 print_distribution("Train", train_df)
 print_distribution("Validation", val_df)
 print_distribution("Test", test_df)
-
 class_weights = compute_class_weights(train_df)
-logger.info("Original class weights: %s", class_weights)
+print("Original class weights:", class_weights)
 class_weights[1] *= 2
-logger.info("Adjusted class weights: %s", class_weights)
+print("Adjusted class weights:", class_weights)
 
 # === MODEL CONSTRUCTION ===
 model, base_model = build_model(model_name, img_size=IMG_SIZE, dropout=DROPOUT, l2_lambda=L2_REG)
-model.summary(print_fn=logger.info)
+model.summary()
 
 # === CALLBACKS ===
 callbacks = [
@@ -115,7 +94,7 @@ callbacks = [
 
 # === HEAD TRAINING ===
 base_model.trainable = False
-logger.info("[INFO] Base model frozen for head training.")
+print("[INFO] Base model frozen for head training.")
 model.compile(
     optimizer=Adam(learning_rate=LEARNING_RATE_HEAD),
     loss="binary_crossentropy",
@@ -126,7 +105,7 @@ model.compile(
         tf.keras.metrics.Recall(name="recall", thresholds=THRESHOLD),
     ]
 )
-logger.info("[INFO] Starting head training...")
+print("[INFO] Starting head training...")
 history_head = model.fit(
     train_gen, validation_data=val_gen, epochs=EPOCHS_HEAD,
     callbacks=callbacks, class_weight=class_weights, verbose=1
@@ -138,7 +117,7 @@ learning_rates = [LEARNING_RATE_FINE_1, LEARNING_RATE_FINE_2, LEARNING_RATE_FINE
 epochs_list = [EPOCHS_FINE_1, EPOCHS_FINE_2, EPOCHS_FINE_3]
 
 for idx, fine_tune_at in enumerate(FINE_TUNE_STEPS):
-    logger.info("[INFO] Unfreezing last %d layers for fine-tuning stage %d.", abs(fine_tune_at), idx+1)
+    print(f"[INFO] Unfreezing last {abs(fine_tune_at)} layers for fine-tuning stage {idx+1}.")
     base_model.trainable = True
     for layer in base_model.layers[:fine_tune_at]:
         layer.trainable = False
@@ -159,7 +138,7 @@ for idx, fine_tune_at in enumerate(FINE_TUNE_STEPS):
         ]
     )
 
-    logger.info("[INFO] Starting fine-tuning stage %d...", idx+1)
+    print(f"[INFO] Starting fine-tuning stage {idx+1}...")
     history_fine = model.fit(
         train_gen, validation_data=val_gen,
         epochs=epochs_list[idx], callbacks=callbacks,
@@ -176,18 +155,18 @@ save_history(history_all, f"models/history_{model_name}.pkl")
 plot_history(history_all, save_path=output_dir, metrics=["accuracy", "loss", "auc", "precision", "recall"])
 
 # === THRESHOLDING ===
-logger.info("[INFO] Calculating optimal threshold using Youden's J statistic...")
+print("[INFO] Calculating optimal threshold using Youden's J statistic...")
 y_val_prob = model.predict(val_gen).flatten()
 y_val_true = np.array(val_gen.classes)
 fpr, tpr, thresholds = roc_curve(y_val_true, y_val_prob)
 youden_index = tpr - fpr
 optimal_idx = np.argmax(youden_index)
 optimal_threshold = thresholds[optimal_idx] if np.isfinite(thresholds[optimal_idx]) else 0.5
-logger.info("[INFO] Optimal validation threshold (Youden's J): %.4f", optimal_threshold)
+print(f"[INFO] Optimal validation threshold (Youden's J): {optimal_threshold:.4f}")
 
 with open(os.path.join(output_dir, "optimal_threshold_val.txt"), "w") as f:
     f.write(f"{optimal_threshold:.4f}\n")
 
 # === TRAINING TIME ===
 elapsed_time = time.time() - start_time
-logger.info("[INFO] Total training time: %dm %ds", int(elapsed_time // 60), int(elapsed_time % 60))
+print(f"[INFO] Total training time: {int(elapsed_time // 60)}m {int(elapsed_time % 60)}s")
