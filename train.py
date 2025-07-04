@@ -15,7 +15,7 @@ from plot_utils import plot_history
 
 # === CONFIGURATION ===
 model_name = "efficientnetb1"
-IMG_SIZE = 240
+IMG_SIZE = 128
 BATCH_SIZE = 32
 
 EPOCHS_HEAD = 25
