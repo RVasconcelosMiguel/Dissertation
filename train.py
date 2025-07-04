@@ -18,12 +18,12 @@ model_name = "efficientnetb1"
 IMG_SIZE = 128
 BATCH_SIZE = 32
 
-EPOCHS_HEAD = 25
+EPOCHS_HEAD = 10
 EPOCHS_FINE_1 = 1
 EPOCHS_FINE_2 = 1
 EPOCHS_FINE_3 = 1
 
-LEARNING_RATE_HEAD = 1e-3
+LEARNING_RATE_HEAD = 1e-4
 LEARNING_RATE_FINE_1 = 1e-5
 LEARNING_RATE_FINE_2 = 1e-6
 LEARNING_RATE_FINE_3 = 1e-7
@@ -32,6 +32,7 @@ DROPOUT = 0.5
 L2_REG = 1e-4
 
 THRESHOLD = 0.5
+LABEL_SMOOTHING = 0.1  # Added label smoothing parameter
 
 FINE_TUNE_STEPS = [-10, -20, -30]
 
@@ -85,8 +86,15 @@ model, base_model = build_model(model_name, img_size=IMG_SIZE, dropout=DROPOUT, 
 model.summary()
 
 # === CALLBACKS ===
-callbacks = [
-    EarlyStopping(monitor="val_auc", mode="max", patience=20, restore_best_weights=True),
+callbacks_h = [
+    EarlyStopping(monitor="val_auc", mode="max", patience=5, restore_best_weights=True),
+    ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
+    ReduceLROnPlateau(monitor="val_auc", mode="max", factor=0.5, patience=5, min_lr=1e-7, verbose=1),
+    RecallLogger()
+]
+
+callbacks_f = [
+    EarlyStopping(monitor="val_auc", mode="max", patience=10, restore_best_weights=True),
     ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
     ReduceLROnPlateau(monitor="val_auc", mode="max", factor=0.5, patience=5, min_lr=1e-7, verbose=1),
     RecallLogger()
@@ -97,7 +105,7 @@ base_model.trainable = False
 print("[INFO] Base model frozen for head training.")
 model.compile(
     optimizer=Adam(learning_rate=LEARNING_RATE_HEAD),
-    loss="binary_crossentropy",
+    loss=tf.keras.losses.BinaryCrossentropy(label_smoothing=LABEL_SMOOTHING),  # Implemented label smoothing here
     metrics=[
         tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
         tf.keras.metrics.AUC(name="auc"),
@@ -108,7 +116,7 @@ model.compile(
 print("[INFO] Starting head training...")
 history_head = model.fit(
     train_gen, validation_data=val_gen, epochs=EPOCHS_HEAD,
-    callbacks=callbacks, class_weight=class_weights, verbose=1
+    callbacks=callbacks_h, class_weight=class_weights, verbose=1
 )
 
 # === GRADUAL FINE-TUNING ===
@@ -129,7 +137,7 @@ for idx, fine_tune_at in enumerate(FINE_TUNE_STEPS):
 
     model.compile(
         optimizer=Adam(learning_rate=learning_rates[idx]),
-        loss="binary_crossentropy",
+        loss=tf.keras.losses.BinaryCrossentropy(label_smoothing=LABEL_SMOOTHING),  # Also here for fine-tuning phases
         metrics=[
             tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
             tf.keras.metrics.AUC(name="auc"),
@@ -141,7 +149,7 @@ for idx, fine_tune_at in enumerate(FINE_TUNE_STEPS):
     print(f"[INFO] Starting fine-tuning stage {idx+1}...")
     history_fine = model.fit(
         train_gen, validation_data=val_gen,
-        epochs=epochs_list[idx], callbacks=callbacks,
+        epochs=epochs_list[idx], callbacks=callbacks_f,
         class_weight=class_weights, verbose=1
     )
     fine_histories[f"fine_{idx+1}"] = history_fine.history
