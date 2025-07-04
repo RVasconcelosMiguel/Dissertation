@@ -19,24 +19,26 @@ IMG_SIZE = 128
 BATCH_SIZE = 32
 
 EPOCHS_HEAD = 15
-EPOCHS_FINE_1 = 8
+EPOCHS_FINE_1 = 15
 EPOCHS_FINE_2 = 5
 EPOCHS_FINE_3 = 3
 
 LEARNING_RATE_HEAD = 1e-4
-LEARNING_RATE_FINE_1 = 1e-5
-LEARNING_RATE_FINE_2 = 1e-6
-LEARNING_RATE_FINE_3 = 1e-7
+LEARNING_RATE_FINE_1 = 1e-6
+LEARNING_RATE_FINE_2 = 5e-6
+LEARNING_RATE_FINE_3 = 1e-6
 
 DROPOUT = 0.5
 L2_REG = 1e-4
 
 THRESHOLD = 0.5
-LABEL_SMOOTHING = 0.05  # Added label smoothing parameter
+LABEL_SMOOTHING = 0  # Added label smoothing parameter
 
 CLASS_WEIGHTS_MULT = 1.5
 
-FINE_TUNE_STEPS = [-10, -20, -30]
+FINE_TUNE_STEPS = [0]#[-10, -20, -30]
+learning_rates = [LEARNING_RATE_FINE_1]#, LEARNING_RATE_FINE_2, LEARNING_RATE_FINE_3]
+epochs_list = [EPOCHS_FINE_1]#, EPOCHS_FINE_2, EPOCHS_FINE_3]
 
 # === PATHS ===
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}"
@@ -96,7 +98,7 @@ callbacks_h = [
 ]
 
 callbacks_f = [
-    EarlyStopping(monitor="val_auc", mode="max", patience=10, restore_best_weights=True),
+    EarlyStopping(monitor="val_auc", mode="max", patience=5, restore_best_weights=True),
     ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
     ReduceLROnPlateau(monitor="val_auc", mode="max", factor=0.5, patience=5, min_lr=1e-7, verbose=1),
     RecallLogger()
@@ -123,8 +125,6 @@ history_head = model.fit(
 
 # === GRADUAL FINE-TUNING ===
 fine_histories = {}
-learning_rates = [LEARNING_RATE_FINE_1, LEARNING_RATE_FINE_2, LEARNING_RATE_FINE_3]
-epochs_list = [EPOCHS_FINE_1, EPOCHS_FINE_2, EPOCHS_FINE_3]
 
 for idx, fine_tune_at in enumerate(FINE_TUNE_STEPS):
     print(f"[INFO] Unfreezing last {abs(fine_tune_at)} layers for fine-tuning stage {idx+1}.")
