@@ -25,13 +25,13 @@ EPOCHS_FINE_1 = 40
 
 LEARNING_RATE_HEAD = 1e-4
 
-DROPOUT = 0.4
+DROPOUT = 0.5
 L2_REG = 1e-5
 
 THRESHOLD = 0.5
 LABEL_SMOOTHING = 0.1  # Added label smoothing parameter
 
-CLASS_WEIGHTS_MULT = 1.7
+CLASS_WEIGHTS_MULT = 2
 
 FINE_TUNE_STEPS = [0]  # Unfreeze all
 
