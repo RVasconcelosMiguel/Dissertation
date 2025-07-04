@@ -89,6 +89,8 @@ print_distribution("Validation", val_df)
 print_distribution("Test", test_df)
 class_weights = compute_class_weights(train_df)
 print(class_weights)
+class_weights[1] *= 2
+print(f"Adjusted class weights: {class_weights}")
 
 # === MODEL CONSTRUCTION ===
 model, base_model = build_model(model_name, img_size=IMG_SIZE, dropout=DROPOUT, l2_lambda=L2_REG)
