@@ -13,6 +13,7 @@ from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLRO
 from model import build_model
 from data_loader import get_generators
 from plot_utils import plot_history
+from losses import focal_loss
 
 # === CONFIGURATION ===
 model_name = "efficientnetb3"
@@ -20,7 +21,7 @@ IMG_SIZE = 300
 BATCH_SIZE = 16
 
 EPOCHS_HEAD = 15
-EPOCHS_FINE_1 = 15
+EPOCHS_FINE_1 = 40
 
 LEARNING_RATE_HEAD = 1e-4
 
