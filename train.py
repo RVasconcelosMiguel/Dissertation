@@ -14,9 +14,9 @@ from data_loader import get_generators
 from plot_utils import plot_history
 
 # === CONFIGURATION ===
-model_name = "efficientnetb1"
-IMG_SIZE = 128
-BATCH_SIZE = 32
+model_name = "efficientnetb3"
+IMG_SIZE = 300
+BATCH_SIZE = 16
 
 EPOCHS_HEAD = 15
 EPOCHS_FINE_1 = 15
@@ -34,7 +34,7 @@ L2_REG = 1e-4
 THRESHOLD = 0.5
 LABEL_SMOOTHING = 0  # Added label smoothing parameter
 
-CLASS_WEIGHTS_MULT = 1.5
+CLASS_WEIGHTS_MULT = 1.2
 
 FINE_TUNE_STEPS = [0]#[-10, -20, -30]
 learning_rates = [LEARNING_RATE_FINE_1]#, LEARNING_RATE_FINE_2, LEARNING_RATE_FINE_3]
