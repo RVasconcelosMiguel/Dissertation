@@ -21,10 +21,10 @@ model_name = "efficientnetb1"
 IMG_SIZE = 128  #240
 BATCH_SIZE = 32
 
-EPOCHS_HEAD = 20
-EPOCHS_FINE_1 = 15
-EPOCHS_FINE_2 = 10
-EPOCHS_FINE_3 = 5
+EPOCHS_HEAD = 25
+EPOCHS_FINE_1 = 20
+EPOCHS_FINE_2 = 15
+EPOCHS_FINE_3 = 10
 
 LEARNING_RATE_HEAD = 1e-3
 LEARNING_RATE_FINE_1 = 1e-5
@@ -96,7 +96,7 @@ model.summary()
 
 # === CALLBACKS ===
 callbacks = [
-    EarlyStopping(monitor="val_auc", mode="max", patience=10, restore_best_weights=True),
+    EarlyStopping(monitor="val_auc", mode="max", patience=20, restore_best_weights=True),
     ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
     ReduceLROnPlateau(monitor="val_auc", mode="max", factor=0.5, patience=5, min_lr=1e-7, verbose=1),
     RecallLogger()
