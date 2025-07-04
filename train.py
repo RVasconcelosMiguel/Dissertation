@@ -222,7 +222,7 @@ fpr, tpr, thresholds = roc_curve(y_val_true, y_val_prob)
 youden_index = tpr - fpr
 optimal_idx = np.argmax(youden_index)
 optimal_threshold = thresholds[optimal_idx] if np.isfinite(thresholds[optimal_idx]) else 0.5
-print(f"[INFO] Optimal validation threshold (Youden's J) : {optimal_threshold:.4f}")
+print(f"[INFO] Optimal validation threshold (Youden's J): {optimal_threshold:.4f}")
 
 with open(os.path.join(output_dir, "optimal_threshold_val.txt"), "w") as f:
     f.write(f"{optimal_threshold:.4f}\n")
