@@ -28,7 +28,7 @@ DROPOUT = 0.4
 L2_REG = 1e-5
 
 THRESHOLD = 0.5
-LABEL_SMOOTHING = 0  # Added label smoothing parameter
+LABEL_SMOOTHING = 0.1  # Added label smoothing parameter
 
 CLASS_WEIGHTS_MULT = 1.7
 
@@ -135,7 +135,7 @@ callbacks_h = [
 ]
 
 callbacks_f = [
-    EarlyStopping(monitor="val_auc", mode="max", patience=10, restore_best_weights=True),
+    EarlyStopping(monitor="val_auc", mode="max", patience=15, restore_best_weights=True),
     ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
     ReduceLROnPlateau(monitor="val_auc", mode="max", factor=0.5, patience=5, min_lr=1e-7, verbose=1),
     RecallLogger()
