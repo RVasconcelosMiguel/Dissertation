@@ -18,7 +18,7 @@ from losses import focal_loss
 # === CONFIGURATION ===
 model_name = "efficientnetb3"
 IMG_SIZE = 300
-BATCH_SIZE = 16
+BATCH_SIZE = 32
 
 EPOCHS_HEAD = 15
 EPOCHS_FINE_1 = 40
@@ -28,10 +28,10 @@ LEARNING_RATE_HEAD = 1e-4
 DROPOUT = 0.5
 L2_REG = 1e-5
 
-THRESHOLD = 0.5
-LABEL_SMOOTHING = 0.1  # Added label smoothing parameter
+THRESHOLD = 0.6
+LABEL_SMOOTHING = 0  # Added label smoothing parameter
 
-CLASS_WEIGHTS_MULT = 2
+CLASS_WEIGHTS_MULT = 2.5
 
 FINE_TUNE_STEPS = [0]  # Unfreeze all
 
