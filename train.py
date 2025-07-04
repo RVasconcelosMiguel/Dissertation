@@ -18,10 +18,10 @@ model_name = "efficientnetb1"
 IMG_SIZE = 128
 BATCH_SIZE = 32
 
-EPOCHS_HEAD = 10
-EPOCHS_FINE_1 = 1
-EPOCHS_FINE_2 = 1
-EPOCHS_FINE_3 = 1
+EPOCHS_HEAD = 15
+EPOCHS_FINE_1 = 8
+EPOCHS_FINE_2 = 5
+EPOCHS_FINE_3 = 3
 
 LEARNING_RATE_HEAD = 1e-4
 LEARNING_RATE_FINE_1 = 1e-5
@@ -32,7 +32,9 @@ DROPOUT = 0.5
 L2_REG = 1e-4
 
 THRESHOLD = 0.5
-LABEL_SMOOTHING = 0.1  # Added label smoothing parameter
+LABEL_SMOOTHING = 0.05  # Added label smoothing parameter
+
+CLASS_WEIGHTS_MULT = 1.5
 
 FINE_TUNE_STEPS = [-10, -20, -30]
 
@@ -78,7 +80,7 @@ print_distribution("Validation", val_df)
 print_distribution("Test", test_df)
 class_weights = compute_class_weights(train_df)
 print("Original class weights:", class_weights)
-class_weights[1] *= 2
+class_weights[1] *= CLASS_WEIGHTS_MULT
 print("Adjusted class weights:", class_weights)
 
 # === MODEL CONSTRUCTION ===
