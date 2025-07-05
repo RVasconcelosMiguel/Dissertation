@@ -52,7 +52,7 @@ print("GPU available:", tf.config.list_physical_devices('GPU'))
 # === HELPER FUNCTIONS ===
 def print_distribution(name, df):
     counts = df['label'].astype(int).value_counts().sort_index()
-    print(f"[{name}] Class 0: {counts.get(0, 0)} | Class 1: {counts.get(1, 0)}")
+    print(f"[{name}] Class 0 : {counts.get(0, 0)} | Class 1: {counts.get(1, 0)}")
 
 def save_history(history, filename):
     with open(filename, "wb") as f:
