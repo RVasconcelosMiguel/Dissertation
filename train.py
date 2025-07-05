@@ -4,6 +4,7 @@ import numpy as np
 import tensorflow as tf
 import time
 import matplotlib.pyplot as plt
+from scipy.optimize import minimize
 from sklearn.metrics import roc_curve
 from sklearn.utils.class_weight import compute_class_weight
 
@@ -20,18 +21,20 @@ model_name = "efficientnetb3"
 IMG_SIZE = 300
 BATCH_SIZE = 32
 
-EPOCHS_HEAD = 15
+EPOCHS_HEAD = 30
 EPOCHS_FINE_1 = 40
 
-LEARNING_RATE_HEAD = 1e-4
+LEARNING_RATE_HEAD = 3e-3
 
-DROPOUT = 0.5
+DROPOUT_HEAD = 0.3
+DROPOUT_FINE = 0.5
 L2_REG = 1e-4
 
 THRESHOLD = 0.6
-LABEL_SMOOTHING = 0  # Added label smoothing parameter
+LABEL_SMOOTHING = 0  # keep single label smoothing for now
 
-CLASS_WEIGHTS_MULT = 2.5
+CLASS_WEIGHTS_MULT_HEAD = 3.0
+CLASS_WEIGHTS_MULT_FINE = 2.5
 
 FINE_TUNE_STEPS = [0]  # Unfreeze all
 
@@ -70,61 +73,36 @@ def compute_class_weights(df):
     weights = compute_class_weight('balanced', classes=classes, y=labels)
     return dict(zip(classes, weights))
 
-# === LEARNING RATE FINDER CALLBACK ===
-class LRFinder(Callback):
-    def __init__(self, min_lr=1e-7, max_lr=1e-2, steps=100):
-        super().__init__()
-        self.min_lr = min_lr
-        self.max_lr = max_lr
-        self.steps = steps
-        self.lr_mult = (max_lr / min_lr) ** (1/steps)
-        self.history = {}
-        self.best_loss = np.inf
+# === TEMPERATURE SCALING ===
+def nll_loss(T, logits, labels):
+    scaled_logits = logits / T
+    probs = tf.sigmoid(scaled_logits).numpy()
+    epsilon = 1e-7
+    probs = np.clip(probs, epsilon, 1 - epsilon)
+    loss = -np.mean(labels * np.log(probs) + (1 - labels) * np.log(1 - probs))
+    return loss
 
-    def on_train_begin(self, logs=None):
-        tf.keras.backend.set_value(self.model.optimizer.lr, self.min_lr)
-        self.history['lr'] = []
-        self.history['loss'] = []
-
-    def on_batch_end(self, batch, logs=None):
-        lr = tf.keras.backend.get_value(self.model.optimizer.lr)
-        loss = logs.get('loss')
-
-        self.history['lr'].append(lr)
-        self.history['loss'].append(loss)
-
-        if loss < self.best_loss:
-            self.best_loss = loss
-
-        if loss > 4 * self.best_loss:
-            self.model.stop_training = True
-            return
-
-        lr *= self.lr_mult
-        tf.keras.backend.set_value(self.model.optimizer.lr, lr)
-
-def plot_lr_finder(history):
-    plt.figure()
-    plt.plot(history['lr'], history['loss'])
-    plt.xscale('log')
-    plt.xlabel("Learning Rate")
-    plt.ylabel("Loss")
-    plt.title("Learning Rate Finder")
-    plt.savefig(os.path.join(output_dir, "lr_finder.png"))
-    plt.close()
+def optimize_temperature(val_logits, val_labels):
+    opt_result = minimize(
+        nll_loss, x0=[1.0], args=(val_logits, val_labels),
+        bounds=[(0.05, 10)]
+    )
+    return opt_result.x[0]
 
 # === DATA LOADING ===
 train_df, val_df, test_df, train_gen, val_gen, test_gen = get_generators(IMG_SIZE, BATCH_SIZE)
 print_distribution("Train", train_df)
 print_distribution("Validation", val_df)
 print_distribution("Test", test_df)
-class_weights = compute_class_weights(train_df)
-print("Original class weights:", class_weights)
-class_weights[1] *= CLASS_WEIGHTS_MULT
-print("Adjusted class weights:", class_weights)
 
-# === MODEL CONSTRUCTION ===
-model, base_model = build_model(model_name, img_size=IMG_SIZE, dropout=DROPOUT, l2_lambda=L2_REG)
+# === CLASS WEIGHTS HEAD ===
+class_weights_head = compute_class_weights(train_df)
+print("Original class weights:", class_weights_head)
+class_weights_head[1] *= CLASS_WEIGHTS_MULT_HEAD
+print("Adjusted class weights (head):", class_weights_head)
+
+# === MODEL CONSTRUCTION FOR HEAD ===
+model, base_model = build_model(model_name, img_size=IMG_SIZE, dropout=DROPOUT_HEAD, l2_lambda=L2_REG)
 model.summary()
 
 # === CALLBACKS ===
@@ -158,28 +136,23 @@ model.compile(
 print("[INFO] Starting head training...")
 history_head = model.fit(
     train_gen, validation_data=val_gen, epochs=EPOCHS_HEAD,
-    callbacks=callbacks_h, class_weight=class_weights, verbose=1
+    callbacks=callbacks_h, class_weight=class_weights_head, verbose=1
 )
 
-# === LEARNING RATE FINDER BEFORE FINE-TUNING ===
-print("[INFO] Starting Learning Rate Finder...")
-lr_finder = LRFinder(min_lr=1e-7, max_lr=1e-3, steps=100)
-model.compile(
-    optimizer=Adam(),
-    loss=tf.keras.losses.BinaryCrossentropy(label_smoothing=LABEL_SMOOTHING)
-)
-model.fit(train_gen, epochs=1, callbacks=[lr_finder], verbose=1)
-plot_lr_finder(lr_finder.history)
-
-# === MANUAL SELECTION OF LR BASED ON LR FINDER ===
-# Inspect 'lr_finder.png' and choose LR in optimal stable region
-FOUND_FINE_TUNE_LR = 3e-5  # Example, replace with your inspected optimal LR
+# === CLASS WEIGHTS FINE-TUNING ===
+class_weights_fine = compute_class_weights(train_df)
+class_weights_fine[1] *= CLASS_WEIGHTS_MULT_FINE
+print("Adjusted class weights (fine-tuning):", class_weights_fine)
 
 # === GRADUAL FINE-TUNING ===
 fine_histories = {}
 
 for idx, fine_tune_at in enumerate(FINE_TUNE_STEPS):
     print(f"[INFO] Unfreezing last {abs(fine_tune_at)} layers for fine-tuning stage {idx+1}.")
+
+    # === REBUILD MODEL WITH FINE DROPOUT ===
+    model, base_model = build_model(model_name, img_size=IMG_SIZE, dropout=DROPOUT_FINE, l2_lambda=L2_REG)
+
     base_model.trainable = True
     for layer in base_model.layers[:fine_tune_at]:
         layer.trainable = False
@@ -189,7 +162,7 @@ for idx, fine_tune_at in enumerate(FINE_TUNE_STEPS):
             layer.trainable = False
 
     model.compile(
-        optimizer=Adam(learning_rate=FOUND_FINE_TUNE_LR),
+        optimizer=Adam(learning_rate=1e-5),
         loss=tf.keras.losses.BinaryCrossentropy(label_smoothing=LABEL_SMOOTHING),
         metrics=[
             tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
@@ -203,7 +176,7 @@ for idx, fine_tune_at in enumerate(FINE_TUNE_STEPS):
     history_fine = model.fit(
         train_gen, validation_data=val_gen,
         epochs=EPOCHS_FINE_1, callbacks=callbacks_f,
-        class_weight=class_weights, verbose=1
+        class_weight=class_weights_fine, verbose=1
     )
     fine_histories[f"fine_{idx+1}"] = history_fine.history
 
@@ -215,15 +188,26 @@ save_history(history_all, f"models/history_{model_name}.pkl")
 # === PLOTTING ===
 plot_history(history_all, save_path=output_dir, metrics=["accuracy", "loss", "auc", "precision", "recall"])
 
+# === TEMPERATURE SCALING ===
+print("[INFO] Starting temperature scaling calibration...")
+val_logits = model.predict(val_gen)
+val_labels = np.array(val_gen.classes)
+optimal_T = optimize_temperature(val_logits, val_labels)
+print(f"[INFO] Optimal temperature for calibration: {optimal_T:.4f}")
+
+with open(os.path.join(output_dir, "optimal_temperature.txt"), "w") as f:
+    f.write(f"{optimal_T:.4f}\n")
+
 # === THRESHOLDING ===
-print("[INFO] Calculating optimal threshold using Youden's J statistic...")
-y_val_prob = model.predict(val_gen).flatten()
-y_val_true = np.array(val_gen.classes)
-fpr, tpr, thresholds = roc_curve(y_val_true, y_val_prob)
+print("[INFO] Calculating optimal threshold using Youden's J statistic with temperature scaling...")
+scaled_logits = val_logits / optimal_T
+scaled_probs = tf.sigmoid(scaled_logits).numpy()
+
+fpr, tpr, thresholds = roc_curve(val_labels, scaled_probs)
 youden_index = tpr - fpr
 optimal_idx = np.argmax(youden_index)
 optimal_threshold = thresholds[optimal_idx] if np.isfinite(thresholds[optimal_idx]) else 0.5
-print(f"[INFO] Optimal validation threshold (Youden's J): {optimal_threshold:.4f}")
+print(f"[INFO] Optimal validation threshold (Youden's J) after temperature scaling: {optimal_threshold:.4f}")
 
 with open(os.path.join(output_dir, "optimal_threshold_val.txt"), "w") as f:
     f.write(f"{optimal_threshold:.4f}\n")
