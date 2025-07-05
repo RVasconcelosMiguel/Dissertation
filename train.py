@@ -14,7 +14,6 @@ from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLRO
 from model import build_model
 from data_loader import get_generators
 from plot_utils import plot_history
-from losses import focal_loss
 
 # === CONFIGURATION ===
 model_name = "efficientnetb3"
@@ -25,16 +24,17 @@ EPOCHS_HEAD = 30
 EPOCHS_FINE_1 = 40
 
 LEARNING_RATE_HEAD = 3e-3
+LEARNING_RATE_FINE = 1e-6
 
-DROPOUT_HEAD = 0.3
-DROPOUT_FINE = 0.5
+DROPOUT = 0.4  # unified dropout
 L2_REG = 1e-4
 
 THRESHOLD = 0.6
-LABEL_SMOOTHING = 0  # keep single label smoothing for now
+LABEL_SMOOTHING_H = 0.05
+LABEL_SMOOTHING_F = 0
 
-CLASS_WEIGHTS_MULT_HEAD = 3.0
-CLASS_WEIGHTS_MULT_FINE = 2.5
+CLASS_WEIGHTS_MULT_HEAD = 2.5
+CLASS_WEIGHTS_MULT_FINE = 2.25
 
 FINE_TUNE_STEPS = [0]  # Unfreeze all
 
@@ -101,8 +101,8 @@ print("Original class weights:", class_weights_head)
 class_weights_head[1] *= CLASS_WEIGHTS_MULT_HEAD
 print("Adjusted class weights (head):", class_weights_head)
 
-# === MODEL CONSTRUCTION FOR HEAD ===
-model, base_model = build_model(model_name, img_size=IMG_SIZE, dropout=DROPOUT_HEAD, l2_lambda=L2_REG)
+# === MODEL CONSTRUCTION ===
+model, base_model = build_model(model_name, img_size=IMG_SIZE, dropout=DROPOUT, l2_lambda=L2_REG)
 model.summary()
 
 # === CALLBACKS ===
@@ -125,7 +125,7 @@ base_model.trainable = False
 print("[INFO] Base model frozen for head training.")
 model.compile(
     optimizer=Adam(learning_rate=LEARNING_RATE_HEAD),
-    loss=tf.keras.losses.BinaryCrossentropy(label_smoothing=LABEL_SMOOTHING),
+    loss=tf.keras.losses.BinaryCrossentropy(label_smoothing=LABEL_SMOOTHING_H),
     metrics=[
         tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
         tf.keras.metrics.AUC(name="auc"),
@@ -150,9 +150,6 @@ fine_histories = {}
 for idx, fine_tune_at in enumerate(FINE_TUNE_STEPS):
     print(f"[INFO] Unfreezing last {abs(fine_tune_at)} layers for fine-tuning stage {idx+1}.")
 
-    # === REBUILD MODEL WITH FINE DROPOUT ===
-    model, base_model = build_model(model_name, img_size=IMG_SIZE, dropout=DROPOUT_FINE, l2_lambda=L2_REG)
-
     base_model.trainable = True
     for layer in base_model.layers[:fine_tune_at]:
         layer.trainable = False
@@ -162,8 +159,8 @@ for idx, fine_tune_at in enumerate(FINE_TUNE_STEPS):
             layer.trainable = False
 
     model.compile(
-        optimizer=Adam(learning_rate=1e-5),
-        loss=tf.keras.losses.BinaryCrossentropy(label_smoothing=LABEL_SMOOTHING),
+        optimizer=Adam(learning_rate=LEARNING_RATE_FINE),
+        loss=tf.keras.losses.BinaryCrossentropy(label_smoothing=LABEL_SMOOTHING_F),
         metrics=[
             tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
             tf.keras.metrics.AUC(name="auc"),
