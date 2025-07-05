@@ -26,7 +26,7 @@ EPOCHS_FINE_1 = 40
 LEARNING_RATE_HEAD = 1e-4
 
 DROPOUT = 0.5
-L2_REG = 1e-5
+L2_REG = 1e-4
 
 THRESHOLD = 0.6
 LABEL_SMOOTHING = 0  # Added label smoothing parameter
@@ -136,7 +136,7 @@ callbacks_h = [
 ]
 
 callbacks_f = [
-    EarlyStopping(monitor="val_auc", mode="max", patience=15, restore_best_weights=True),
+    EarlyStopping(monitor="val_auc", mode="max", patience=20, restore_best_weights=True),
     ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
     ReduceLROnPlateau(monitor="val_auc", mode="max", factor=0.5, patience=5, min_lr=1e-7, verbose=1),
     RecallLogger()
