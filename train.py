@@ -95,9 +95,10 @@ print_distribution("Train", train_df)
 print_distribution("Validation", val_df)
 print_distribution("Test", test_df)
 
-# === CHECK BATCH LABELS UNIQUE ===
-batch = next(train_gen)
-print("Batch labels unique:", np.unique(batch[1]))
+# === DEBUG: Check unique labels in a batch to verify augmentation outputs ===
+for batch in train_gen.take(1):
+    images, labels = batch
+    print("Batch labels unique:", np.unique(labels.numpy()))
 
 # === CLASS WEIGHTS HEAD ===
 class_weights_head = compute_class_weights(train_df)
