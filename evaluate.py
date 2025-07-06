@@ -74,14 +74,17 @@ results = model.evaluate(test_gen, verbose=1)
 for name, val in zip(model.metrics_names, results):
     print(f"{name}: {val:.4f}")
 
-# === Extract true labels from test dataset BEFORE predict ===
+# === Recreate test_gen before extracting labels ===
+_, _, _, _, val_gen, test_gen = get_generators(IMG_SIZE, BATCH_SIZE)
+
+# === Extract true labels from test dataset ===
 print("[INFO] Extracting true labels from test set...")
 y_true_batches = []
 for batch in test_gen:
     y_true_batches.append(batch[1])
 y_true = np.concatenate(y_true_batches, axis=0)
 
-# === Recreate test_gen before prediction ===
+# === Recreate test_gen before prediction (optional if generator reuses files without shuffle) ===
 _, _, _, _, val_gen, test_gen = get_generators(IMG_SIZE, BATCH_SIZE)
 
 # === Generate ROC Curve ===
