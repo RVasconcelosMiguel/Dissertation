@@ -3,6 +3,7 @@ import pickle
 import numpy as np
 import tensorflow as tf
 import time
+import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 from sklearn.metrics import roc_curve
 from sklearn.utils.class_weight import compute_class_weight
@@ -11,7 +12,6 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau, Callback
 
 from model import build_model
-from losses import focal_loss
 from data_loader import get_generators
 from plot_utils import plot_history
 
@@ -24,9 +24,9 @@ EPOCHS_HEAD = 30
 EPOCHS_FINE_1 = 40
 
 LEARNING_RATE_HEAD = 3e-3
-LEARNING_RATE_FINE = 1e-4
+LEARNING_RATE_FINE = 3e-5
 
-DROPOUT = 0.5
+DROPOUT = 0.5  # unified dropout
 L2_REG = 5e-4
 
 THRESHOLD = 0.5
@@ -35,12 +35,6 @@ LABEL_SMOOTHING_F = 0.05
 
 CLASS_WEIGHTS_MULT_HEAD = 1.75
 CLASS_WEIGHTS_MULT_FINE = 1.2
-
-PATIENCE_H = 5
-PATIENCE_F = 5
-
-gamma=2
-alpha=0.4
 
 FINE_TUNE_STEPS = [0]  # Unfreeze all
 
@@ -82,11 +76,11 @@ def compute_class_weights(df):
 # === TEMPERATURE SCALING ===
 def nll_loss(T, logits, labels):
     scaled_logits = logits / T
-    probs = tf.sigmoid(scaled_logits)
+    probs = tf.sigmoid(scaled_logits).numpy()
     epsilon = 1e-7
-    probs = tf.clip_by_value(probs, epsilon, 1 - epsilon)
-    loss = -tf.reduce_mean(labels * tf.math.log(probs) + (1 - labels) * tf.math.log(1 - probs))
-    return loss.numpy()
+    probs = np.clip(probs, epsilon, 1 - epsilon)
+    loss = -np.mean(labels * np.log(probs) + (1 - labels) * np.log(1 - probs))
+    return loss
 
 def optimize_temperature(val_logits, val_labels):
     opt_result = minimize(
@@ -103,22 +97,24 @@ print_distribution("Test", test_df)
 
 # === CLASS WEIGHTS HEAD ===
 class_weights_head = compute_class_weights(train_df)
+print("Original class weights:", class_weights_head)
 class_weights_head[1] *= CLASS_WEIGHTS_MULT_HEAD
 print("Adjusted class weights (head):", class_weights_head)
 
 # === MODEL CONSTRUCTION ===
 model, base_model = build_model(model_name, img_size=IMG_SIZE, dropout=DROPOUT, l2_lambda=L2_REG)
+model.summary()
 
 # === CALLBACKS ===
 callbacks_h = [
-    EarlyStopping(monitor="val_auc", mode="max", patience=PATIENCE_H, restore_best_weights=True),
+    EarlyStopping(monitor="val_auc", mode="max", patience=10, restore_best_weights=True),
     ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
     ReduceLROnPlateau(monitor="val_auc", mode="max", factor=0.5, patience=5, min_lr=1e-7, verbose=1),
     RecallLogger()
 ]
 
 callbacks_f = [
-    EarlyStopping(monitor="val_auc", mode="max", patience=PATIENCE_F, restore_best_weights=True),
+    EarlyStopping(monitor="val_auc", mode="max", patience=20, restore_best_weights=True),
     ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
     ReduceLROnPlateau(monitor="val_auc", mode="max", factor=0.5, patience=5, min_lr=1e-7, verbose=1),
     RecallLogger()
@@ -129,7 +125,7 @@ base_model.trainable = False
 print("[INFO] Base model frozen for head training.")
 model.compile(
     optimizer=Adam(learning_rate=LEARNING_RATE_HEAD),
-    loss=focal_loss(gamma, alpha),
+    loss=tf.keras.losses.BinaryCrossentropy(label_smoothing=LABEL_SMOOTHING_H),
     metrics=[
         tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
         tf.keras.metrics.AUC(name="auc"),
@@ -158,14 +154,13 @@ for idx, fine_tune_at in enumerate(FINE_TUNE_STEPS):
     for layer in base_model.layers[:fine_tune_at]:
         layer.trainable = False
 
-    # === Freeze BatchNorm layers to maintain stable statistics ===
     for layer in base_model.layers:
         if isinstance(layer, tf.keras.layers.BatchNormalization):
             layer.trainable = False
 
     model.compile(
         optimizer=Adam(learning_rate=LEARNING_RATE_FINE),
-        loss=focal_loss(gamma, alpha),
+        loss=tf.keras.losses.BinaryCrossentropy(label_smoothing=LABEL_SMOOTHING_F),
         metrics=[
             tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
             tf.keras.metrics.AUC(name="auc"),
@@ -201,7 +196,7 @@ with open(os.path.join(output_dir, "optimal_temperature.txt"), "w") as f:
     f.write(f"{optimal_T:.4f}\n")
 
 # === THRESHOLDING ===
-print("[INFO] Calculating optimal threshold using Youden's J statistic with temperature scaling ...")
+print("[INFO] Calculating optimal threshold using Youden's J statistic with temperature scaling...")
 scaled_logits = val_logits / optimal_T
 scaled_probs = tf.sigmoid(scaled_logits).numpy()
 

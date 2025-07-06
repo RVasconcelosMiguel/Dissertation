@@ -1,9 +1,7 @@
 import os
 import pandas as pd
-import numpy as np
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.applications.efficientnet import preprocess_input
-import cv2
 
 # === BASE PATHS ===
 BASE_PATH = "/raid/DATASETS/rmiguel_datasets/ISIC16/Classification/Split"
@@ -12,31 +10,11 @@ train_folder = os.path.join(BASE_PATH, "train")
 val_folder = os.path.join(BASE_PATH, "val")
 test_folder = os.path.join(BASE_PATH, "test")
 
-# === SEED FOR REPRODUCIBILITY ===
-SEED = 42
-
 # === LOAD CSV DATAFRAMES ===
 def load_dataframes(csv_path):
     df = pd.read_csv(csv_path, header=None, names=['image', 'label'])
-    df['label'] = df['label'].astype(str)  # For flow_from_dataframe compatibility
+    df['label'] = df['label'].astype(str)  # Convert labels to string for flow_from_dataframe compatibility
     return df
-
-# === CUSTOM PREPROCESSING FUNCTION WITH HSV SHIFT ===
-def custom_preprocess(img):
-    img = preprocess_input(img)  # EfficientNet preprocessing
-
-    # Convert to HSV for hue/saturation adjustment
-    img_hsv = cv2.cvtColor((img + 1) * 127.5, cv2.COLOR_RGB2HSV).astype(np.float32)
-    hue_shift = np.random.uniform(-5, 5)
-    sat_shift = np.random.uniform(-10, 10)
-
-    img_hsv[..., 0] = (img_hsv[..., 0] + hue_shift) % 180
-    img_hsv[..., 1] = np.clip(img_hsv[..., 1] + sat_shift, 0, 255)
-
-    img_rgb = cv2.cvtColor(img_hsv.astype(np.uint8), cv2.COLOR_HSV2RGB)
-    img_rgb = img_rgb / 127.5 - 1  # Back to EfficientNet scale
-
-    return img_rgb
 
 # === DATA GENERATORS FUNCTION ===
 def get_generators(img_size, batch_size):
@@ -54,16 +32,17 @@ def get_generators(img_size, batch_size):
     print("[DEBUG] Sample train_df:")
     print(train_df.head())
 
-    # === Define online augmentation for training ===
+    # === Define augmentation for training with EfficientNet preprocessing ===
     train_datagen = ImageDataGenerator(
-        preprocessing_function=custom_preprocess,
-        rotation_range=15,
-        width_shift_range=0.1,
-        height_shift_range=0.1,
-        zoom_range=0.1,
+        preprocessing_function=preprocess_input,
+        rotation_range=90,
+        width_shift_range=0.15,
+        height_shift_range=0.15,
+        shear_range=15,
+        zoom_range=0.2,
         horizontal_flip=True,
-        vertical_flip=True,
-        brightness_range=[0.85, 1.15],
+        vertical_flip=True,  # Disable for dermoscopy unless orientation invariant
+        brightness_range=[0.8,1.2],
         fill_mode='nearest'
     )
 
@@ -80,7 +59,7 @@ def get_generators(img_size, batch_size):
         class_mode="binary",
         batch_size=batch_size,
         shuffle=True,
-        seed=SEED
+        seed=42
     )
 
     # === Validation generator ===
@@ -109,6 +88,3 @@ def get_generators(img_size, batch_size):
 
     return train_df, val_df, test_df, train_gen, val_gen, test_gen
 
-# === USAGE EXAMPLE ===
-if __name__ == "__main__":
-    train_df, val_df, test_df, train_gen, val_gen, test_gen = get_generators(img_size=224, batch_size=32)

@@ -49,25 +49,14 @@ def build_efficientnetb2(img_size, dropout, l2_lambda):
 def build_efficientnetb3(img_size, dropout, l2_lambda):
     input_tensor = Input(shape=(img_size, img_size, 3))
     base_model = EfficientNetB3(include_top=False, weights="imagenet", input_tensor=input_tensor)
-    
     x = base_model.output
     x = GlobalAveragePooling2D()(x)
-    
-    # === Dense Block 1 ===
-    x = Dense(256, kernel_regularizer=l2(l2_lambda))(x)
     x = BatchNormalization()(x)
-    x = swish(x)
+    x = Dense(256, activation=swish, kernel_regularizer=l2(l2_lambda))(x)
     x = Dropout(dropout)(x)
-    
-    # === Dense Block 2 ===
-    x = Dense(128, kernel_regularizer=l2(l2_lambda))(x)
-    x = BatchNormalization()(x)
-    x = swish(x)
+    x = Dense(128, activation=swish, kernel_regularizer=l2(l2_lambda))(x)
     x = Dropout(dropout)(x)
-    
-    # === Output logits layer (no activation) ===
-    output = Dense(1, kernel_regularizer=l2(l2_lambda))(x)
-    
+    output = Dense(1, activation="sigmoid", kernel_regularizer=l2(l2_lambda))(x)
     model = Model(inputs=base_model.input, outputs=output)
     return model, base_model
 

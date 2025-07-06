@@ -11,7 +11,7 @@ echo "=== Preprocess ==="
 #python 2_preprocess.py
 
 echo "=== Augmentation ==="
-#python 3_augmentation.py | tee ../files_to_transfer/aug_log.txt
+#python 3_augmentation.py
 
 
 
