@@ -39,7 +39,7 @@ print(f"[INFO] Loaded optimal threshold: {optimal_threshold:.4f}")
 _, _, _, _, val_gen, test_gen = get_generators(IMG_SIZE, BATCH_SIZE)
 
 # === Build Model ===
-print(f"[INFO] Building model architecture: {model_name}...")
+print(f"[INFO] GENERATORS DONE. Building model architecture: {model_name}...")
 model, _ = build_model(
     model_name=model_name,
     img_size=IMG_SIZE,
