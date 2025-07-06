@@ -68,17 +68,6 @@ model.compile(
     metrics=thresholded_metrics
 )
 
-# === Extract true labels from test dataset BEFORE predict to avoid generator exhaustion ===
-print("[INFO] Extracting true labels from test set...")
-y_true_batches = []
-for batch in test_gen:
-    y_true_batches.append(batch[1])  # batch[1] is already numpy array
-
-y_true = np.concatenate(y_true_batches, axis=0)
-
-# === Recreate test_gen if needed before predict (depends on generator implementation) ===
-_, _, _, _, val_gen, test_gen = get_generators(IMG_SIZE, BATCH_SIZE)
-
 # === Evaluate on Test Set ===
 print("[INFO] Evaluating on test set...")
 results = model.evaluate(test_gen, verbose=1)
@@ -88,6 +77,15 @@ for name, val in zip(model.metrics_names, results):
 # === Generate ROC Curve ===
 print("[INFO] Generating ROC curve...")
 y_prob = model.predict(test_gen).flatten()
+
+# === Extract true labels from test dataset ===
+print("[INFO] Extracting true labels from test set...")
+y_true_batches = []
+for batch in test_gen:
+    # FIXED: batch[1] is already a numpy array; no need to call .numpy()
+    y_true_batches.append(batch[1])
+
+y_true = np.concatenate(y_true_batches, axis=0)
 
 roc_curve_path = os.path.join(output_dir, "roc_curve_test.png")
 save_roc_curve(y_true, y_prob, roc_curve_path)
