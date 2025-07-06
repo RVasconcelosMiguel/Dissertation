@@ -79,9 +79,11 @@ print("[INFO] Generating ROC curve...")
 y_prob = model.predict(test_gen).flatten()
 
 # === Extract true labels from test dataset ===
+print("[INFO] Extracting true labels from test set...")
 y_true_batches = []
 for batch in test_gen:
-    y_true_batches.append(batch[1].numpy())
+    # FIXED: batch[1] is already a numpy array; no need to call .numpy()
+    y_true_batches.append(batch[1])
 
 y_true = np.concatenate(y_true_batches, axis=0)
 
@@ -90,7 +92,6 @@ save_roc_curve(y_true, y_prob, roc_curve_path)
 roc_auc = roc_auc_score(y_true, y_prob)
 print(f"[INFO] ROC curve saved to {roc_curve_path}")
 print(f"[INFO] Test ROC AUC: {roc_auc:.4f}")
-
 
 # === Save prediction probability histogram ===
 print("[INFO] Saving prediction probability histogram...")
