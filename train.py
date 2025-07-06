@@ -11,6 +11,7 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau, Callback
 
 from model import build_model
+from losses import focal_loss
 from data_loader import get_generators
 from plot_utils import plot_history
 
@@ -34,6 +35,12 @@ LABEL_SMOOTHING_F = 0.05
 
 CLASS_WEIGHTS_MULT_HEAD = 1.75
 CLASS_WEIGHTS_MULT_FINE = 1.2
+
+PATIENCE_H = 5
+PATIENCE_F = 5
+
+gamma=2
+alpha=0.4
 
 FINE_TUNE_STEPS = [0]  # Unfreeze all
 
@@ -104,14 +111,14 @@ model, base_model = build_model(model_name, img_size=IMG_SIZE, dropout=DROPOUT, 
 
 # === CALLBACKS ===
 callbacks_h = [
-    EarlyStopping(monitor="val_auc", mode="max", patience=5, restore_best_weights=True),
+    EarlyStopping(monitor="val_auc", mode="max", patience=PATIENCE_H, restore_best_weights=True),
     ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
     ReduceLROnPlateau(monitor="val_auc", mode="max", factor=0.5, patience=5, min_lr=1e-7, verbose=1),
     RecallLogger()
 ]
 
 callbacks_f = [
-    EarlyStopping(monitor="val_auc", mode="max", patience=10, restore_best_weights=True),
+    EarlyStopping(monitor="val_auc", mode="max", patience=PATIENCE_F, restore_best_weights=True),
     ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
     ReduceLROnPlateau(monitor="val_auc", mode="max", factor=0.5, patience=5, min_lr=1e-7, verbose=1),
     RecallLogger()
@@ -122,7 +129,7 @@ base_model.trainable = False
 print("[INFO] Base model frozen for head training.")
 model.compile(
     optimizer=Adam(learning_rate=LEARNING_RATE_HEAD),
-    loss=tf.keras.losses.BinaryCrossentropy(from_logits=True, label_smoothing=LABEL_SMOOTHING_H),
+    loss=focal_loss(gamma, alpha),
     metrics=[
         tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
         tf.keras.metrics.AUC(name="auc"),
@@ -158,7 +165,7 @@ for idx, fine_tune_at in enumerate(FINE_TUNE_STEPS):
 
     model.compile(
         optimizer=Adam(learning_rate=LEARNING_RATE_FINE),
-        loss=tf.keras.losses.BinaryCrossentropy(from_logits=True, label_smoothing=LABEL_SMOOTHING_F),
+        loss=focal_loss(gamma, alpha),
         metrics=[
             tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
             tf.keras.metrics.AUC(name="auc"),
