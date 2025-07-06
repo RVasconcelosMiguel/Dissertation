@@ -95,6 +95,10 @@ print_distribution("Train", train_df)
 print_distribution("Validation", val_df)
 print_distribution("Test", test_df)
 
+# === CHECK BATCH LABELS UNIQUE ===
+batch = next(train_gen)
+print("Batch labels unique:", np.unique(batch[1]))
+
 # === CLASS WEIGHTS HEAD ===
 class_weights_head = compute_class_weights(train_df)
 print("Original class weights:", class_weights_head)
