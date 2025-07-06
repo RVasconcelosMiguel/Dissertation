@@ -11,7 +11,7 @@ echo "=== Preprocess ==="
 #python 2_preprocess.py
 
 echo "=== Augmentation ==="
-#python 3_augmentation.py
+python 3_augmentation.py | tee ../files_to_transfer/aug_log.txt
 
 
 
@@ -20,4 +20,4 @@ echo "=== TRAINING ==="
 #python train.py | tee ../files_to_transfer/efficientnetb3/train_log.txt
 
 echo "=== EVALUATION ==="
-python evaluate.py | tee ../files_to_transfer/efficientnetb3/evaluate_log.txt
+#python evaluate.py | tee ../files_to_transfer/efficientnetb3/evaluate_log.txt
