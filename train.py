@@ -194,7 +194,7 @@ with open(os.path.join(output_dir, "optimal_temperature.txt"), "w") as f:
     f.write(f"{optimal_T:.4f}\n")
 
 # === THRESHOLDING ===
-print("[INFO] Calculating optimal threshold using Youden's J statistic with temperature scaling...")
+print("[INFO] Calculating optimal threshold using Youden's J statistic with temperature scaling ...")
 scaled_logits = val_logits / optimal_T
 scaled_probs = tf.sigmoid(scaled_logits).numpy()
 
