@@ -1,4 +1,5 @@
 # === evaluate.py ===
+
 import os
 import time
 import tensorflow as tf
@@ -50,7 +51,7 @@ model, _ = build_model(
 print(f"[INFO] Loading weights from: {WEIGHTS_PATH}")
 if not os.path.exists(WEIGHTS_PATH + ".index"):
     raise FileNotFoundError(f"Missing weights: {WEIGHTS_PATH}.index")
-model.load_weights(WEIGHTS_PATH)
+model.load_weights(WEIGHTS_PATH).expect_partial()
 
 # === Compile Model for Evaluation ===
 thresholded_metrics = [
@@ -60,6 +61,7 @@ thresholded_metrics = [
     tf.keras.metrics.Recall(name="recall", thresholds=optimal_threshold),
 ]
 
+# Compile with dummy optimizer (not used in evaluation)
 model.compile(
     optimizer=tf.keras.optimizers.Adam(learning_rate=3e-5),
     loss="binary_crossentropy",
@@ -85,7 +87,7 @@ print(f"[INFO] Test ROC AUC: {roc_auc:.4f}")
 
 # === Save prediction probability histogram ===
 print("[INFO] Saving prediction probability histogram...")
-plt.figure(figsize=(8,6))
+plt.figure(figsize=(8, 6))
 plt.hist(y_prob, bins=50, color='skyblue', edgecolor='black')
 plt.title("Test Prediction Probabilities")
 plt.xlabel("Predicted probability")
@@ -98,7 +100,9 @@ print(f"[INFO] Histogram saved to {hist_path}")
 # === Threshold-based Predictions and Classification Report ===
 print("[INFO] Generating classification report...")
 y_pred = (y_prob >= optimal_threshold).astype(int)
-labels = list(test_gen.class_indices.keys())
+
+# Handle binary labels
+labels = ["class_0", "class_1"]
 
 report = classification_report(y_true, y_pred, target_names=labels, digits=4)
 print("[INFO] Classification report:")
