@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
+import tensorflow as tf
 from tensorflow.keras.applications.efficientnet import preprocess_input
 
 # === BASE PATHS ===
@@ -13,78 +13,101 @@ test_folder = os.path.join(BASE_PATH, "test")
 # === LOAD CSV DATAFRAMES ===
 def load_dataframes(csv_path):
     df = pd.read_csv(csv_path, header=None, names=['image', 'label'])
-    df['label'] = df['label'].astype(str)  # Convert labels to string for flow_from_dataframe compatibility
+    df['label'] = df['label'].astype(int)
     return df
 
-# === DATA GENERATORS FUNCTION ===
+# === IMAGE PARSE FUNCTION ===
+def parse_image(filename, label, folder, img_size):
+    image_string = tf.io.read_file(tf.strings.join([folder, '/', filename]))
+    image = tf.image.decode_jpeg(image_string, channels=3)
+    image = tf.image.resize(image, [img_size, img_size])
+    image = preprocess_input(image)
+    return image, tf.cast(label, tf.float32)
+
+# === MIXUP FUNCTION ===
+def mixup(ds_one, ds_two, alpha=0.2):
+    # Sample lambda from beta distribution
+    lambda_val = tf.random.gamma([], alpha, beta=alpha)
+    lambda_val = tf.maximum(lambda_val, 1 - lambda_val)
+
+    image1, label1 = ds_one
+    image2, label2 = ds_two
+
+    mixed_image = lambda_val * image1 + (1 - lambda_val) * image2
+    mixed_label = lambda_val * label1 + (1 - lambda_val) * label2
+    return mixed_image, mixed_label
+
+# === CUTMIX FUNCTION ===
+def cutmix(ds_one, ds_two, img_size, alpha=1.0):
+    lambda_val = tf.random.gamma([], alpha, beta=alpha)
+    image1, label1 = ds_one
+    image2, label2 = ds_two
+
+    # Compute CutMix bounding box
+    cut_rat = tf.math.sqrt(1. - lambda_val)
+    cut_w = tf.cast(img_size * cut_rat, tf.int32)
+    cut_h = tf.cast(img_size * cut_rat, tf.int32)
+
+    # Uniform random center
+    cx = tf.random.uniform([], 0, img_size, tf.int32)
+    cy = tf.random.uniform([], 0, img_size, tf.int32)
+
+    # Bounding box coordinates
+    x1 = tf.clip_by_value(cx - cut_w // 2, 0, img_size)
+    y1 = tf.clip_by_value(cy - cut_h // 2, 0, img_size)
+    x2 = tf.clip_by_value(cx + cut_w // 2, 0, img_size)
+    y2 = tf.clip_by_value(cy + cut_h // 2, 0, img_size)
+
+    # Apply CutMix
+    cutmix_image = image1
+    cutmix_image = tf.tensor_scatter_nd_update(cutmix_image, 
+        tf.reshape(tf.stack([tf.range(y1,y2),tf.range(x1,x2)],axis=1),(-1,2)), 
+        tf.reshape(image2[y1:y2, x1:x2, :], (-1,3)))
+
+    lambda_adjusted = 1 - ((x2 - x1) * (y2 - y1) / (img_size * img_size))
+    mixed_label = lambda_adjusted * label1 + (1 - lambda_adjusted) * label2
+
+    return cutmix_image, mixed_label
+
+# === DATASET BUILDER WITH AUGMENTATION ===
+def get_dataset(df, folder, img_size, batch_size, augment_type=None):
+    filenames = df['image'].values
+    labels = df['label'].values
+
+    ds = tf.data.Dataset.from_tensor_slices((filenames, labels))
+    ds = ds.shuffle(len(df))
+    ds = ds.map(lambda x,y: parse_image(x,y,folder,img_size), num_parallel_calls=tf.data.AUTOTUNE)
+
+    if augment_type == "mixup":
+        ds1 = ds.shuffle(len(df))
+        ds2 = ds.shuffle(len(df))
+        ds = tf.data.Dataset.zip((ds1, ds2))
+        ds = ds.map(mixup, num_parallel_calls=tf.data.AUTOTUNE)
+    elif augment_type == "cutmix":
+        ds1 = ds.shuffle(len(df))
+        ds2 = ds.shuffle(len(df))
+        ds = tf.data.Dataset.zip((ds1, ds2))
+        ds = ds.map(lambda x,y: cutmix(x,y,img_size), num_parallel_calls=tf.data.AUTOTUNE)
+
+    ds = ds.batch(batch_size)
+    ds = ds.prefetch(tf.data.AUTOTUNE)
+    return ds
+
+# === MAIN GENERATORS FUNCTION ===
 def get_generators(img_size, batch_size):
     # Load dataframes
     train_df = load_dataframes(os.path.join(train_folder, "train_labels.csv"))
     val_df = load_dataframes(os.path.join(val_folder, "val_labels.csv"))
     test_df = load_dataframes(os.path.join(test_folder, "test_labels.csv"))
 
-    # === Verify label distributions ===
+    # Print distributions
     print("Train label distribution:\n", train_df['label'].value_counts())
     print("Val label distribution:\n", val_df['label'].value_counts())
     print("Test label distribution:\n", test_df['label'].value_counts())
 
-    # === Print dataframe samples for path sanity check ===
-    print("[DEBUG] Sample train_df:")
-    print(train_df.head())
+    # === Build datasets ===
+    train_ds = get_dataset(train_df, train_folder, img_size, batch_size, augment_type="mixup")
+    val_ds = get_dataset(val_df, val_folder, img_size, batch_size, augment_type=None)
+    test_ds = get_dataset(test_df, test_folder, img_size, batch_size, augment_type=None)
 
-    # === Define augmentation for training with EfficientNet preprocessing ===
-    train_datagen = ImageDataGenerator(
-        preprocessing_function=preprocess_input,
-        rotation_range=90,
-        width_shift_range=0.15,
-        height_shift_range=0.15,
-        shear_range=15,
-        zoom_range=0.2,
-        horizontal_flip=True,
-        vertical_flip=True,  # Disable for dermoscopy unless orientation invariant
-        brightness_range=[0.8,1.2],
-        fill_mode='nearest'
-    )
-
-    # === Define preprocessing only for validation and test sets ===
-    test_val_datagen = ImageDataGenerator(preprocessing_function=preprocess_input)
-
-    # === Training generator ===
-    train_gen = train_datagen.flow_from_dataframe(
-        dataframe=train_df,
-        directory=train_folder,
-        x_col="image",
-        y_col="label",
-        target_size=(img_size, img_size),
-        class_mode="binary",
-        batch_size=batch_size,
-        shuffle=True,
-        seed=42
-    )
-
-    # === Validation generator ===
-    val_gen = test_val_datagen.flow_from_dataframe(
-        dataframe=val_df,
-        directory=val_folder,
-        x_col="image",
-        y_col="label",
-        target_size=(img_size, img_size),
-        class_mode="binary",
-        batch_size=batch_size,
-        shuffle=False
-    )
-
-    # === Test generator ===
-    test_gen = test_val_datagen.flow_from_dataframe(
-        dataframe=test_df,
-        directory=test_folder,
-        x_col="image",
-        y_col="label",
-        target_size=(img_size, img_size),
-        class_mode="binary",
-        batch_size=batch_size,
-        shuffle=False
-    )
-
-    return train_df, val_df, test_df, train_gen, val_gen, test_gen
-
+    return train_df, val_df, test_df, train_ds, val_ds, test_ds
