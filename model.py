@@ -52,9 +52,9 @@ def build_efficientnetb3(img_size, dropout, l2_lambda):
     x = base_model.output
     x = GlobalAveragePooling2D()(x)
     x = BatchNormalization()(x)
-    x = Dense(256, activation=swish, kernel_regularizer=l2(l2_lambda))(x)
-    x = Dropout(dropout)(x)
     x = Dense(128, activation=swish, kernel_regularizer=l2(l2_lambda))(x)
+    x = Dropout(dropout)(x)
+    x = Dense(64, activation=swish, kernel_regularizer=l2(l2_lambda))(x)
     x = Dropout(dropout)(x)
     output = Dense(1, activation="sigmoid", kernel_regularizer=l2(l2_lambda))(x)
     model = Model(inputs=base_model.input, outputs=output)
