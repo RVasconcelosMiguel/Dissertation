@@ -17,16 +17,16 @@ from plot_utils import plot_history
 
 # === CONFIGURATION ===
 model_name = "efficientnetb4"
-IMG_SIZE = 300
-BATCH_SIZE = 32
+IMG_SIZE = 380
+BATCH_SIZE = 16
 
 EPOCHS_HEAD = 30
 EPOCHS_FINE_1 = 40
 
 LEARNING_RATE_HEAD = 3e-3
-LEARNING_RATE_FINE = 3e-5
+LEARNING_RATE_FINE = 1e-4
 
-DROPOUT = 0.5  # unified dropout
+DROPOUT = 0.5
 L2_REG = 5e-4
 
 THRESHOLD = 0.5
@@ -125,7 +125,7 @@ base_model.trainable = False
 print("[INFO] Base model frozen for head training.")
 model.compile(
     optimizer=Adam(learning_rate=LEARNING_RATE_HEAD),
-    loss=tf.keras.losses.BinaryCrossentropy(label_smoothing=LABEL_SMOOTHING_H),
+    loss=tf.keras.losses.BinaryCrossentropy(from_logits=True, label_smoothing=LABEL_SMOOTHING_H),
     metrics=[
         tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
         tf.keras.metrics.AUC(name="auc"),
@@ -160,7 +160,7 @@ for idx, fine_tune_at in enumerate(FINE_TUNE_STEPS):
 
     model.compile(
         optimizer=Adam(learning_rate=LEARNING_RATE_FINE),
-        loss=tf.keras.losses.BinaryCrossentropy(label_smoothing=LABEL_SMOOTHING_F),
+        loss=tf.keras.losses.BinaryCrossentropy(from_logits=True, label_smoothing=LABEL_SMOOTHING_F),
         metrics=[
             tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
             tf.keras.metrics.AUC(name="auc"),
