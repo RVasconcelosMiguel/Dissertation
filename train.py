@@ -108,7 +108,7 @@ print("Adjusted class weights (head):", class_weights_head)
 
 # === MODEL CONSTRUCTION ===
 model, base_model = build_model(model_name, img_size=IMG_SIZE, dropout=DROPOUT, l2_lambda=L2_REG)
-model.summary()
+#model.summary()
 
 # === CALLBACKS ===
 callbacks_h = [
