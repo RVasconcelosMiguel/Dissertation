@@ -1,8 +1,9 @@
 import os
 import pandas as pd
-import tensorflow as tf
+import numpy as np
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.applications.efficientnet import preprocess_input
-import tensorflow_probability as tfp
+import cv2
 
 # === BASE PATHS ===
 BASE_PATH = "/raid/DATASETS/rmiguel_datasets/ISIC16/Classification/Split"
@@ -11,112 +12,103 @@ train_folder = os.path.join(BASE_PATH, "train")
 val_folder = os.path.join(BASE_PATH, "val")
 test_folder = os.path.join(BASE_PATH, "test")
 
+# === SEED FOR REPRODUCIBILITY ===
+SEED = 42
+
 # === LOAD CSV DATAFRAMES ===
 def load_dataframes(csv_path):
     df = pd.read_csv(csv_path, header=None, names=['image', 'label'])
-    df['label'] = df['label'].astype(int)
+    df['label'] = df['label'].astype(str)  # For flow_from_dataframe compatibility
     return df
 
-# === IMAGE PARSE FUNCTION ===
-def parse_image(filename, label, folder, img_size):
-    image_string = tf.io.read_file(tf.strings.join([folder, '/', filename]))
-    image = tf.image.decode_jpeg(image_string, channels=3)
-    image = tf.image.resize(image, [img_size, img_size])
-    image = preprocess_input(image)
-    label = tf.cast(label, tf.float32)
-    return image, label
+# === CUSTOM PREPROCESSING FUNCTION WITH HSV SHIFT ===
+def custom_preprocess(img):
+    img = preprocess_input(img)  # EfficientNet preprocessing
 
-# === MIXUP FUNCTION ===
-def mixup(ds_one, ds_two, alpha=0.2):
-    image1, label1 = ds_one
-    image2, label2 = ds_two
+    # Convert to HSV for hue/saturation adjustment
+    img_hsv = cv2.cvtColor((img + 1) * 127.5, cv2.COLOR_RGB2HSV).astype(np.float32)
+    hue_shift = np.random.uniform(-5, 5)
+    sat_shift = np.random.uniform(-10, 10)
 
-    beta = tfp.distributions.Beta(alpha, alpha)
-    lambda_val = beta.sample()
-    
-    mixed_image = lambda_val * image1 + (1 - lambda_val) * image2
-    mixed_label = lambda_val * label1 + (1 - lambda_val) * label2
-    mixed_label = tf.clip_by_value(mixed_label, 0, 1)  # Ensure labels remain valid
+    img_hsv[..., 0] = (img_hsv[..., 0] + hue_shift) % 180
+    img_hsv[..., 1] = np.clip(img_hsv[..., 1] + sat_shift, 0, 255)
 
-    return mixed_image, mixed_label
+    img_rgb = cv2.cvtColor(img_hsv.astype(np.uint8), cv2.COLOR_HSV2RGB)
+    img_rgb = img_rgb / 127.5 - 1  # Back to EfficientNet scale
 
-# === CUTMIX FUNCTION ===
-def cutmix(ds_one, ds_two, img_size, alpha=1.0):
-    image1, label1 = ds_one
-    image2, label2 = ds_two
+    return img_rgb
 
-    beta = tfp.distributions.Beta(alpha, alpha)
-    lambda_val = beta.sample()
-
-    cut_rat = tf.math.sqrt(1. - lambda_val)
-    cut_w = tf.cast(img_size * cut_rat, tf.int32)
-    cut_h = tf.cast(img_size * cut_rat, tf.int32)
-
-    cx = tf.random.uniform([], 0, img_size, tf.int32)
-    cy = tf.random.uniform([], 0, img_size, tf.int32)
-
-    x1 = tf.clip_by_value(cx - cut_w // 2, 0, img_size)
-    y1 = tf.clip_by_value(cy - cut_h // 2, 0, img_size)
-    x2 = tf.clip_by_value(cx + cut_w // 2, 0, img_size)
-    y2 = tf.clip_by_value(cy + cut_h // 2, 0, img_size)
-
-    # Create mask
-    bbx1, bby1, bbx2, bby2 = x1, y1, x2, y2
-
-    patch = image2[bby1:bby2, bbx1:bbx2, :]
-    pad_top = bby1
-    pad_bottom = img_size - bby2
-    pad_left = bbx1
-    pad_right = img_size - bbx2
-
-    patch_padded = tf.pad(patch, [[pad_top, pad_bottom], [pad_left, pad_right], [0,0]], constant_values=0)
-    mask = tf.cast(patch_padded != 0, image1.dtype)
-
-    cutmix_image = image1 * (1 - mask) + patch_padded
-
-    lambda_adjusted = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (img_size * img_size))
-    mixed_label = lambda_adjusted * label1 + (1 - lambda_adjusted) * label2
-    mixed_label = tf.clip_by_value(mixed_label, 0, 1)
-
-    return cutmix_image, mixed_label
-
-# === DATASET BUILDER WITH AUGMENTATION ===
-def get_dataset(df, folder, img_size, batch_size, augment_type=None):
-    filenames = df['image'].values
-    labels = df['label'].values
-
-    ds = tf.data.Dataset.from_tensor_slices((filenames, labels))
-    ds = ds.shuffle(len(df))
-    ds = ds.map(lambda x, y: parse_image(x, y, folder, img_size), num_parallel_calls=tf.data.AUTOTUNE)
-
-    if augment_type == "mixup":
-        ds1 = ds.shuffle(len(df))
-        ds2 = ds.shuffle(len(df))
-        ds = tf.data.Dataset.zip((ds1, ds2))
-        ds = ds.map(mixup, num_parallel_calls=tf.data.AUTOTUNE)
-
-    elif augment_type == "cutmix":
-        ds1 = ds.shuffle(len(df))
-        ds2 = ds.shuffle(len(df))
-        ds = tf.data.Dataset.zip((ds1, ds2))
-        ds = ds.map(lambda x, y: cutmix(x, y, img_size), num_parallel_calls=tf.data.AUTOTUNE)
-
-    ds = ds.batch(batch_size)
-    ds = ds.prefetch(tf.data.AUTOTUNE)
-    return ds
-
-# === MAIN GENERATORS FUNCTION ===
+# === DATA GENERATORS FUNCTION ===
 def get_generators(img_size, batch_size):
+    # Load dataframes
     train_df = load_dataframes(os.path.join(train_folder, "train_labels.csv"))
     val_df = load_dataframes(os.path.join(val_folder, "val_labels.csv"))
     test_df = load_dataframes(os.path.join(test_folder, "test_labels.csv"))
 
+    # === Verify label distributions ===
     print("Train label distribution:\n", train_df['label'].value_counts())
     print("Val label distribution:\n", val_df['label'].value_counts())
     print("Test label distribution:\n", test_df['label'].value_counts())
 
-    train_ds = get_dataset(train_df, train_folder, img_size, batch_size, augment_type="mixup")
-    val_ds = get_dataset(val_df, val_folder, img_size, batch_size)
-    test_ds = get_dataset(test_df, test_folder, img_size, batch_size)
+    # === Print dataframe samples for path sanity check ===
+    print("[DEBUG] Sample train_df:")
+    print(train_df.head())
 
-    return train_df, val_df, test_df, train_ds, val_ds, test_ds
+    # === Define online augmentation for training ===
+    train_datagen = ImageDataGenerator(
+        preprocessing_function=custom_preprocess,
+        rotation_range=15,
+        width_shift_range=0.1,
+        height_shift_range=0.1,
+        zoom_range=0.1,
+        horizontal_flip=True,
+        vertical_flip=True,
+        brightness_range=[0.85, 1.15],
+        fill_mode='nearest'
+    )
+
+    # === Define preprocessing only for validation and test sets ===
+    test_val_datagen = ImageDataGenerator(preprocessing_function=preprocess_input)
+
+    # === Training generator ===
+    train_gen = train_datagen.flow_from_dataframe(
+        dataframe=train_df,
+        directory=train_folder,
+        x_col="image",
+        y_col="label",
+        target_size=(img_size, img_size),
+        class_mode="binary",
+        batch_size=batch_size,
+        shuffle=True,
+        seed=SEED
+    )
+
+    # === Validation generator ===
+    val_gen = test_val_datagen.flow_from_dataframe(
+        dataframe=val_df,
+        directory=val_folder,
+        x_col="image",
+        y_col="label",
+        target_size=(img_size, img_size),
+        class_mode="binary",
+        batch_size=batch_size,
+        shuffle=False
+    )
+
+    # === Test generator ===
+    test_gen = test_val_datagen.flow_from_dataframe(
+        dataframe=test_df,
+        directory=test_folder,
+        x_col="image",
+        y_col="label",
+        target_size=(img_size, img_size),
+        class_mode="binary",
+        batch_size=batch_size,
+        shuffle=False
+    )
+
+    return train_df, val_df, test_df, train_gen, val_gen, test_gen
+
+# === USAGE EXAMPLE ===
+if __name__ == "__main__":
+    train_df, val_df, test_df, train_gen, val_gen, test_gen = get_generators(img_size=224, batch_size=32)

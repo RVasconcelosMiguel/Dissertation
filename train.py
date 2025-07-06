@@ -3,7 +3,6 @@ import pickle
 import numpy as np
 import tensorflow as tf
 import time
-import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 from sklearn.metrics import roc_curve
 from sklearn.utils.class_weight import compute_class_weight
@@ -24,9 +23,9 @@ EPOCHS_HEAD = 30
 EPOCHS_FINE_1 = 40
 
 LEARNING_RATE_HEAD = 3e-3
-LEARNING_RATE_FINE = 3e-5
+LEARNING_RATE_FINE = 1e-4
 
-DROPOUT = 0.5  # unified dropout
+DROPOUT = 0.5
 L2_REG = 5e-4
 
 THRESHOLD = 0.5
@@ -76,11 +75,11 @@ def compute_class_weights(df):
 # === TEMPERATURE SCALING ===
 def nll_loss(T, logits, labels):
     scaled_logits = logits / T
-    probs = tf.sigmoid(scaled_logits).numpy()
+    probs = tf.sigmoid(scaled_logits)
     epsilon = 1e-7
-    probs = np.clip(probs, epsilon, 1 - epsilon)
-    loss = -np.mean(labels * np.log(probs) + (1 - labels) * np.log(1 - probs))
-    return loss
+    probs = tf.clip_by_value(probs, epsilon, 1 - epsilon)
+    loss = -tf.reduce_mean(labels * tf.math.log(probs) + (1 - labels) * tf.math.log(1 - probs))
+    return loss.numpy()
 
 def optimize_temperature(val_logits, val_labels):
     opt_result = minimize(
@@ -95,20 +94,13 @@ print_distribution("Train", train_df)
 print_distribution("Validation", val_df)
 print_distribution("Test", test_df)
 
-# === DEBUG: Check unique labels in a batch to verify augmentation outputs ===
-for batch in train_gen.take(1):
-    images, labels = batch
-    print("Batch labels unique:", np.unique(labels.numpy()))
-
 # === CLASS WEIGHTS HEAD ===
 class_weights_head = compute_class_weights(train_df)
-print("Original class weights:", class_weights_head)
 class_weights_head[1] *= CLASS_WEIGHTS_MULT_HEAD
 print("Adjusted class weights (head):", class_weights_head)
 
 # === MODEL CONSTRUCTION ===
 model, base_model = build_model(model_name, img_size=IMG_SIZE, dropout=DROPOUT, l2_lambda=L2_REG)
-#model.summary()
 
 # === CALLBACKS ===
 callbacks_h = [
@@ -130,7 +122,7 @@ base_model.trainable = False
 print("[INFO] Base model frozen for head training.")
 model.compile(
     optimizer=Adam(learning_rate=LEARNING_RATE_HEAD),
-    loss=tf.keras.losses.BinaryCrossentropy(label_smoothing=LABEL_SMOOTHING_H),
+    loss=tf.keras.losses.BinaryCrossentropy(from_logits=True, label_smoothing=LABEL_SMOOTHING_H),
     metrics=[
         tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
         tf.keras.metrics.AUC(name="auc"),
@@ -159,13 +151,14 @@ for idx, fine_tune_at in enumerate(FINE_TUNE_STEPS):
     for layer in base_model.layers[:fine_tune_at]:
         layer.trainable = False
 
+    # === Freeze BatchNorm layers to maintain stable statistics ===
     for layer in base_model.layers:
         if isinstance(layer, tf.keras.layers.BatchNormalization):
             layer.trainable = False
 
     model.compile(
         optimizer=Adam(learning_rate=LEARNING_RATE_FINE),
-        loss=tf.keras.losses.BinaryCrossentropy(label_smoothing=LABEL_SMOOTHING_F),
+        loss=tf.keras.losses.BinaryCrossentropy(from_logits=True, label_smoothing=LABEL_SMOOTHING_F),
         metrics=[
             tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
             tf.keras.metrics.AUC(name="auc"),
