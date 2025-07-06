@@ -77,13 +77,20 @@ for name, val in zip(model.metrics_names, results):
 # === Generate ROC Curve ===
 print("[INFO] Generating ROC curve...")
 y_prob = model.predict(test_gen).flatten()
-y_true = np.array(test_gen.classes)
+
+# === Extract true labels from test dataset ===
+y_true_batches = []
+for batch in test_gen:
+    y_true_batches.append(batch[1].numpy())
+
+y_true = np.concatenate(y_true_batches, axis=0)
 
 roc_curve_path = os.path.join(output_dir, "roc_curve_test.png")
 save_roc_curve(y_true, y_prob, roc_curve_path)
 roc_auc = roc_auc_score(y_true, y_prob)
 print(f"[INFO] ROC curve saved to {roc_curve_path}")
 print(f"[INFO] Test ROC AUC: {roc_auc:.4f}")
+
 
 # === Save prediction probability histogram ===
 print("[INFO] Saving prediction probability histogram...")
