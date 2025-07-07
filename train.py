@@ -20,23 +20,24 @@ model_name = "efficientnetb4"
 IMG_SIZE = 380
 BATCH_SIZE = 16
 
-EPOCHS_HEAD = 30
-EPOCHS_FINE_1 = 40
+# Head training configuration
+EPOCHS_HEAD = 55
+LEARNING_RATE_HEAD = 1e-4
+LABEL_SMOOTHING_H = 0.1
 
-LEARNING_RATE_HEAD = 1e-3
-LEARNING_RATE_FINE = 5e-5
+# Fine-tuning configuration (3 phases)
+FINE_TUNE_UNFREEZE_PERCENTS = [20, 50, 100]  # Percentages of model to unfreeze
+FINE_TUNE_EPOCHS = [1, 1, 1]
+FINE_TUNE_LRS = [5e-5, 2e-5, 1e-5]
+LABEL_SMOOTHING_F = 0
 
 DROPOUT = 0.5
 L2_REG = 5e-4
 
 THRESHOLD = 0.5
-LABEL_SMOOTHING_H = 0
-LABEL_SMOOTHING_F = 0
 
-CLASS_WEIGHTS_MULT_HEAD = 2
+CLASS_WEIGHTS_MULT_HEAD = 3
 CLASS_WEIGHTS_MULT_FINE = 2
-
-FINE_TUNE_STEPS = [0]  # Unfreeze all
 
 # === PATHS ===
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}"
@@ -97,24 +98,15 @@ print_distribution("Test", test_df)
 
 # === CLASS WEIGHTS HEAD ===
 class_weights_head = compute_class_weights(train_df)
-print("Original class weights:", class_weights_head)
 class_weights_head[1] *= CLASS_WEIGHTS_MULT_HEAD
 print("Adjusted class weights (head):", class_weights_head)
 
 # === MODEL CONSTRUCTION ===
 model, base_model = build_model(model_name, img_size=IMG_SIZE, dropout=DROPOUT, l2_lambda=L2_REG)
-#model.summary()
 
 # === CALLBACKS ===
-callbacks_h = [
-    EarlyStopping(monitor="val_auc", mode="max", patience=12, restore_best_weights=True),
-    ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
-    ReduceLROnPlateau(monitor="val_auc", mode="max", factor=0.5, patience=4, min_lr=1e-7, verbose=1),
-    RecallLogger()
-]
-
-callbacks_f = [
-    EarlyStopping(monitor="val_auc", mode="max", patience=12, restore_best_weights=True),
+callbacks_template = lambda: [
+    EarlyStopping(monitor="val_auc", mode="max", patience=16, restore_best_weights=True),
     ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
     ReduceLROnPlateau(monitor="val_auc", mode="max", factor=0.5, patience=4, min_lr=1e-7, verbose=1),
     RecallLogger()
@@ -136,7 +128,7 @@ model.compile(
 print("[INFO] Starting head training...")
 history_head = model.fit(
     train_gen, validation_data=val_gen, epochs=EPOCHS_HEAD,
-    callbacks=callbacks_h, class_weight=class_weights_head, verbose=1
+    callbacks=callbacks_template(), class_weight=class_weights_head, verbose=1
 )
 
 # === CLASS WEIGHTS FINE-TUNING ===
@@ -146,9 +138,11 @@ print("Adjusted class weights (fine-tuning):", class_weights_fine)
 
 # === GRADUAL FINE-TUNING ===
 fine_histories = {}
+total_layers = len(base_model.layers)
 
-for idx, fine_tune_at in enumerate(FINE_TUNE_STEPS):
-    print(f"[INFO] Unfreezing last {abs(fine_tune_at)} layers for fine-tuning stage {idx+1}.")
+for idx, (unfreeze_percent, epochs, lr) in enumerate(zip(FINE_TUNE_UNFREEZE_PERCENTS, FINE_TUNE_EPOCHS, FINE_TUNE_LRS)):
+    fine_tune_at = int(total_layers * (1 - unfreeze_percent / 100))
+    print(f"[INFO] Fine-tuning stage {idx+1}: unfreezing last {unfreeze_percent}% of layers ({total_layers - fine_tune_at}/{total_layers} layers), lr={lr}")
 
     base_model.trainable = True
     for layer in base_model.layers[:fine_tune_at]:
@@ -159,7 +153,7 @@ for idx, fine_tune_at in enumerate(FINE_TUNE_STEPS):
             layer.trainable = False
 
     model.compile(
-        optimizer=Adam(learning_rate=LEARNING_RATE_FINE),
+        optimizer=Adam(learning_rate=lr),
         loss=tf.keras.losses.BinaryCrossentropy(from_logits=False, label_smoothing=LABEL_SMOOTHING_F),
         metrics=[
             tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
@@ -172,7 +166,7 @@ for idx, fine_tune_at in enumerate(FINE_TUNE_STEPS):
     print(f"[INFO] Starting fine-tuning stage {idx+1}...")
     history_fine = model.fit(
         train_gen, validation_data=val_gen,
-        epochs=EPOCHS_FINE_1, callbacks=callbacks_f,
+        epochs=epochs, callbacks=callbacks_template(),
         class_weight=class_weights_fine, verbose=1
     )
     fine_histories[f"fine_{idx+1}"] = history_fine.history

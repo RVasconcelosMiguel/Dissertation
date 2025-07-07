@@ -56,6 +56,38 @@ def plot_history(histories, save_path, metrics):
         plt.close()
 
 
+def plot_history_head(history, save_path, metrics):
+    """
+    Plot training and validation metrics for head-only training (single phase).
+
+    Args:
+        history (dict): Training history dictionary (from model.fit()).
+        save_path (str): Directory path to save plots.
+        metrics (list): List of metric names to plot.
+    """
+    os.makedirs(save_path, exist_ok=True)
+
+    for metric in metrics:
+        plt.figure(figsize=(8, 6))
+        train_metric = history.get(metric, [])
+        val_metric = history.get(f"val_{metric}", [])
+
+        if train_metric:
+            plt.plot(range(len(train_metric)), train_metric, label="train")
+        if val_metric:
+            plt.plot(range(len(val_metric)), val_metric, label="val")
+
+        plt.title(f"Head {metric.capitalize()} Curve")
+        plt.xlabel("Epoch")
+        plt.ylabel(metric.capitalize())
+        plt.legend()
+        plt.grid(True)
+
+        metric_filename = f"{metric}_head_curve.png"
+        metric_save_path = os.path.join(save_path, metric_filename)
+        plt.savefig(metric_save_path)
+        print(f"[DEBUG] Saved head {metric} plot to {metric_save_path}")
+        plt.close()
 
 
 def save_confusion_matrix(y_true, y_pred, labels, save_path):
@@ -71,6 +103,7 @@ def save_confusion_matrix(y_true, y_pred, labels, save_path):
     plt.tight_layout()
     plt.savefig(save_path)
     plt.close()
+
 
 def save_roc_curve(y_true, y_scores, save_path):
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
