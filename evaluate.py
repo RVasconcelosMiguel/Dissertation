@@ -13,7 +13,7 @@ from plot_utils import save_confusion_matrix, save_roc_curve
 # === CONFIGURATION ===
 model_name = "efficientnetb4"
 IMG_SIZE = 380
-BATCH_SIZE = 32
+BATCH_SIZE = 16
 
 # === Paths ===
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}"

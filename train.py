@@ -18,7 +18,7 @@ from plot_utils import plot_history
 # === CONFIGURATION ===
 model_name = "efficientnetb4"
 IMG_SIZE = 380
-BATCH_SIZE = 32
+BATCH_SIZE = 16
 
 EPOCHS_HEAD = 30
 EPOCHS_FINE_1 = 40
@@ -103,7 +103,7 @@ print("Adjusted class weights (head):", class_weights_head)
 
 # === MODEL CONSTRUCTION ===
 model, base_model = build_model(model_name, img_size=IMG_SIZE, dropout=DROPOUT, l2_lambda=L2_REG)
-model.summary()
+#model.summary()
 
 # === CALLBACKS ===
 callbacks_h = [
@@ -125,7 +125,7 @@ base_model.trainable = False
 print("[INFO] Base model frozen for head training.")
 model.compile(
     optimizer=Adam(learning_rate=LEARNING_RATE_HEAD),
-    loss=tf.keras.losses.BinaryCrossentropy(from_logits=True, label_smoothing=LABEL_SMOOTHING_H),
+    loss=tf.keras.losses.BinaryCrossentropy(from_logits=False, label_smoothing=LABEL_SMOOTHING_H),
     metrics=[
         tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
         tf.keras.metrics.AUC(name="auc"),
@@ -160,7 +160,7 @@ for idx, fine_tune_at in enumerate(FINE_TUNE_STEPS):
 
     model.compile(
         optimizer=Adam(learning_rate=LEARNING_RATE_FINE),
-        loss=tf.keras.losses.BinaryCrossentropy(from_logits=True, label_smoothing=LABEL_SMOOTHING_F),
+        loss=tf.keras.losses.BinaryCrossentropy(from_logits=False, label_smoothing=LABEL_SMOOTHING_F),
         metrics=[
             tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
             tf.keras.metrics.AUC(name="auc"),
