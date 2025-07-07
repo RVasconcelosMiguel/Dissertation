@@ -5,6 +5,7 @@ import pickle
 import numpy as np
 import tensorflow as tf
 import time
+import random
 from scipy.optimize import minimize
 from sklearn.metrics import roc_curve
 from sklearn.utils.class_weight import compute_class_weight
@@ -17,6 +18,12 @@ from model import build_model
 from data_loader import get_generators
 from plot_utils import plot_history
 
+# === SEED FOR REPRODUCIBILITY ===
+SEED = 42
+tf.random.set_seed(SEED)
+np.random.seed(SEED)
+random.seed(SEED)
+
 # === CONFIGURATION ===
 model_name = "efficientnetb4"
 IMG_SIZE = 380
@@ -24,7 +31,7 @@ BATCH_SIZE = 16
 
 # Fine-tuning configuration (3 phases)
 FINE_TUNE_UNFREEZE_PERCENTS = [20, 50, 100]
-FINE_TUNE_EPOCHS = [8, 8, 8]
+FINE_TUNE_EPOCHS = [10, 15, 20]
 FINE_TUNE_LRS = [5e-5, 2e-5, 1e-5]
 LABEL_SMOOTHING_F = 0
 
@@ -78,12 +85,14 @@ def nll_loss(T, logits, labels):
     loss = -np.mean(labels * np.log(probs) + (1 - labels) * np.log(1 - probs))
     return loss
 
-def optimize_temperature(val_logits, val_labels):
+def optimize_temperature(val_probs, val_labels):
+    # Convert probs to logits before scaling
+    logits = np.log(val_probs / (1 - val_probs))
     opt_result = minimize(
-        nll_loss, x0=[1.0], args=(val_logits, val_labels),
+        nll_loss, x0=[1.0], args=(logits, val_labels),
         bounds=[(0.05, 10)]
     )
-    return opt_result.x[0]
+    return opt_result.x[0], logits
 
 # === DATA LOADING ===
 train_df, val_df, test_df, train_gen, val_gen, test_gen = get_generators(IMG_SIZE, BATCH_SIZE)
@@ -103,11 +112,11 @@ model, base_model = build_model(model_name, img_size=IMG_SIZE, dropout=DROPOUT, 
 print(f"[INFO] Loading head-trained weights from: {HEAD_WEIGHTS_PATH}")
 model.load_weights(HEAD_WEIGHTS_PATH)
 
-# === CALLBACKS ===
+# === CALLBACKS TEMPLATE ===
 callbacks_template = lambda: [
-    EarlyStopping(monitor="val_auc", mode="max", patience=8, restore_best_weights=True),
+    EarlyStopping(monitor="val_auc", mode="max", patience=12, restore_best_weights=True),
     ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
-    ReduceLROnPlateau(monitor="val_auc", mode="max", factor=0.5, patience=4, min_lr=1e-7, verbose=1),
+    #ReduceLROnPlateau(monitor="val_auc", mode="max", factor=0.5, patience=4, min_lr=1e-7, verbose=1),
     RecallLogger()
 ]
 
@@ -125,16 +134,16 @@ for idx, (unfreeze_percent, epochs, lr) in enumerate(zip(FINE_TUNE_UNFREEZE_PERC
 
     for layer in base_model.layers:
         if isinstance(layer, tf.keras.layers.BatchNormalization):
-            layer.trainable = False
-    
+            layer.trainable = True  # keep BN layers adaptive
+
     lr_schedule = ExponentialDecay(
         initial_learning_rate=lr,
-        decay_steps=500,                         
-        decay_rate=0.8,                           
+        decay_steps=500,
+        decay_rate=0.8,
         staircase=True)
 
     model.compile(
-        optimizer = Adam(learning_rate=lr_schedule),
+        optimizer=Adam(learning_rate=lr_schedule),
         loss=tf.keras.losses.BinaryCrossentropy(from_logits=False, label_smoothing=LABEL_SMOOTHING_F),
         metrics=[
             tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
@@ -160,17 +169,17 @@ plot_history(fine_histories, save_path=output_dir, metrics=["accuracy", "loss", 
 
 # === TEMPERATURE SCALING ===
 print("[INFO] Starting temperature scaling calibration...")
-val_logits = model.predict(val_gen)
+val_probs = model.predict(val_gen)
 val_labels = np.array(val_gen.classes)
-optimal_T = optimize_temperature(val_logits, val_labels)
+optimal_T, logits = optimize_temperature(val_probs, val_labels)
 print(f"[INFO] Optimal temperature for calibration: {optimal_T:.4f}")
 
 with open(os.path.join(output_dir, "optimal_temperature.txt"), "w") as f:
     f.write(f"{optimal_T:.4f}\n")
 
-# === THRESHOLDING ===
+# === THRESHOLDING (Youden's J) ===
 print("[INFO] Calculating optimal threshold using Youden's J statistic with temperature scaling...")
-scaled_logits = val_logits / optimal_T
+scaled_logits = logits / optimal_T
 scaled_probs = tf.sigmoid(scaled_logits).numpy()
 
 fpr, tpr, thresholds = roc_curve(val_labels, scaled_probs)

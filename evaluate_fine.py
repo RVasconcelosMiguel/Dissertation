@@ -4,7 +4,7 @@ import time
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.metrics import classification_report, roc_auc_score, roc_curve
+from sklearn.metrics import classification_report, roc_auc_score
 
 from model import build_model
 from data_loader import get_generators
@@ -42,7 +42,7 @@ print(f"[INFO] Building model architecture: {model_name}...")
 model, _ = build_model(
     model_name=model_name,
     img_size=IMG_SIZE,
-    dropout=0.3,
+    dropout=0.0,   # Disable dropout during evaluation
     l2_lambda=1e-3
 )
 
@@ -52,31 +52,13 @@ if not os.path.exists(WEIGHTS_PATH + ".index"):
     raise FileNotFoundError(f"Missing weights: {WEIGHTS_PATH}.index")
 model.load_weights(WEIGHTS_PATH)
 
-# === Compile Model for Evaluation ===
-thresholded_metrics = [
-    tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=optimal_threshold),
-    tf.keras.metrics.AUC(name="auc"),
-    tf.keras.metrics.Precision(name="precision", thresholds=optimal_threshold),
-    tf.keras.metrics.Recall(name="recall", thresholds=optimal_threshold),
-]
-
-model.compile(
-    optimizer=tf.keras.optimizers.Adam(learning_rate=3e-5),
-    loss="binary_crossentropy",
-    metrics=thresholded_metrics
-)
-
-# === Evaluate on Test Set ===
-print("[INFO] Evaluating on test set...")
-results = model.evaluate(test_gen, verbose=1)
-for name, val in zip(model.metrics_names, results):
-    print(f"{name}: {val:.4f}")
-
-# === Generate ROC Curve ===
-print("[INFO] Generating ROC curve...")
+# === Predict on Test Set ===
+print("[INFO] Predicting on test set...")
 y_prob = model.predict(test_gen).flatten()
 y_true = np.array(test_gen.classes)
 
+# === Generate ROC Curve ===
+print("[INFO] Generating ROC curve...")
 roc_curve_path = os.path.join(output_dir, "roc_curve_test_finetune.png")
 save_roc_curve(y_true, y_prob, roc_curve_path)
 roc_auc = roc_auc_score(y_true, y_prob)
@@ -108,15 +90,6 @@ print(report)
 conf_matrix_path = os.path.join(output_dir, "confusion_matrix_finetune.png")
 save_confusion_matrix(y_true, y_pred, labels, conf_matrix_path)
 print(f"[INFO] Confusion matrix saved to {conf_matrix_path}")
-
-# === Save Evaluation Report ===
-eval_report_path = os.path.join(output_dir, "evaluation_report_finetune.txt")
-with open(eval_report_path, "w") as f:
-    f.write(f"Model evaluated: {model_name} (fine-tuned)\n")
-    f.write(f"Threshold used: {optimal_threshold:.4f}\n")
-    f.write(f"Test ROC AUC: {roc_auc:.4f}\n\n")
-    f.write(report)
-print(f"[INFO] Evaluation report saved to {eval_report_path}")
 
 end_time = time.time()
 duration = end_time - start_time
