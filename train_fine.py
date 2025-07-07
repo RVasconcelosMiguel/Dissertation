@@ -31,15 +31,15 @@ BATCH_SIZE = 16
 
 # Fine-tuning configuration (3 phases)
 FINE_TUNE_UNFREEZE_PERCENTS = [20, 50, 100]
-FINE_TUNE_EPOCHS = [1, 1, 1]
+FINE_TUNE_EPOCHS = [15, 20, 30]
 FINE_TUNE_LRS = [5e-5, 2e-5, 1e-5]
 LABEL_SMOOTHING_F = 0
 
-DROPOUT = 0.5
-L2_REG = 5e-4
+DROPOUT = 0.6
+L2_REG = 1e-3
 
 THRESHOLD = 0.5
-CLASS_WEIGHTS_MULT_FINE = 2
+CLASS_WEIGHTS_MULT_FINE = 2.25
 
 # === PATHS ===
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}/fine"
@@ -136,10 +136,16 @@ for idx, (unfreeze_percent, epochs, lr) in enumerate(zip(FINE_TUNE_UNFREEZE_PERC
         if isinstance(layer, tf.keras.layers.BatchNormalization):
             layer.trainable = True  # keep BN layers adaptive
 
+    decay_steps_dict = {0: 100, 1: 200, 2: 300}
+    decay_rate_dict = {0: 0.8, 1: 0.85, 2: 0.9}
+
+    decay_steps = decay_steps_dict[idx]
+    decay_rate = decay_rate_dict[idx]
+
     lr_schedule = ExponentialDecay(
         initial_learning_rate=lr,
-        decay_steps=500,
-        decay_rate=0.8,
+        decay_steps=decay_steps,
+        decay_rate=decay_rate,
         staircase=True)
 
     model.compile(
