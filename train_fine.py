@@ -31,7 +31,7 @@ BATCH_SIZE = 16
 
 # Fine-tuning configuration (3 phases)
 FINE_TUNE_UNFREEZE_PERCENTS = [20, 50, 100]
-FINE_TUNE_EPOCHS = [10, 15, 20]
+FINE_TUNE_EPOCHS = [1, 1, 1]
 FINE_TUNE_LRS = [5e-5, 2e-5, 1e-5]
 LABEL_SMOOTHING_F = 0
 
@@ -42,9 +42,9 @@ THRESHOLD = 0.5
 CLASS_WEIGHTS_MULT_FINE = 2
 
 # === PATHS ===
-output_dir = f"models/fine"
+output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}/fine"
 os.makedirs(output_dir, exist_ok=True)
-MODEL_PATH = f"{output_dir}/{model_name}_fine_weights"
+MODEL_PATH = f"models/{model_name}_fine_weights"
 HEAD_WEIGHTS_PATH = f"models/{model_name}_head_weights"
 
 # === ENVIRONMENT SETUP ===
@@ -162,7 +162,7 @@ for idx, (unfreeze_percent, epochs, lr) in enumerate(zip(FINE_TUNE_UNFREEZE_PERC
     fine_histories[f"fine_{idx+1}"] = history_fine.history
 
 # === SAVE HISTORY ===
-save_history(fine_histories, f"{output_dir}/history_{model_name}_fine.pkl")
+save_history(fine_histories, f"models/history_{model_name}_fine.pkl")
 
 # === PLOTTING ===
 plot_history(fine_histories, save_path=output_dir, metrics=["accuracy", "loss", "auc", "precision", "recall"])
