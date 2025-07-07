@@ -45,7 +45,7 @@ model, _ = build_model(
 print(f"[INFO] Loading head-only weights from: {WEIGHTS_PATH}")
 if not os.path.exists(WEIGHTS_PATH + ".index"):
     raise FileNotFoundError(f"Missing head weights: {WEIGHTS_PATH}.index")
-model.load_weights(WEIGHTS_PATH)
+model.load_weights(WEIGHTS_PATH).expect_partial()
 
 # === Compile Model for Evaluation ===
 thresholded_metrics = [
