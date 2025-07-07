@@ -34,7 +34,6 @@ L2_REG = 5e-4
 THRESHOLD = 0.5
 CLASS_WEIGHTS_MULT_FINE = 2
 
-
 # === PATHS ===
 output_dir = f"models/fine"
 os.makedirs(output_dir, exist_ok=True)
@@ -62,7 +61,8 @@ def save_history(history, filename):
 class RecallLogger(Callback):
     def on_epoch_end(self, epoch, logs=None):
         recall = logs.get("val_recall")
-        print(f"[Epoch {epoch+1}] val_recall: {recall:.4f}")
+        lr = self.model.optimizer._decayed_lr(tf.float32).numpy()
+        print(f"[Epoch {epoch+1}] val_recall: {recall:.4f} - lr: {lr:.8f}")
 
 def compute_class_weights(df):
     labels = df['label'].astype(int)
@@ -129,12 +129,12 @@ for idx, (unfreeze_percent, epochs, lr) in enumerate(zip(FINE_TUNE_UNFREEZE_PERC
     
     lr_schedule = ExponentialDecay(
         initial_learning_rate=lr,
-        decay_steps=1000,                         
-        decay_rate=0.9,                           
+        decay_steps=500,                         
+        decay_rate=0.8,                           
         staircase=True)
 
     model.compile(
-        optimizer = Adam(learning_rate=lr_schedule)
+        optimizer = Adam(learning_rate=lr_schedule),
         loss=tf.keras.losses.BinaryCrossentropy(from_logits=False, label_smoothing=LABEL_SMOOTHING_F),
         metrics=[
             tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
