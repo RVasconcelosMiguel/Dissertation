@@ -8,6 +8,7 @@ from sklearn.utils.class_weight import compute_class_weight
 
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau, Callback
+from tensorflow.keras.optimizers.schedules import ExponentialDecay
 
 from model import build_model
 from data_loader import get_generators
@@ -23,13 +24,19 @@ EPOCHS_HEAD = 60
 LEARNING_RATE_HEAD = 5e-5
 LABEL_SMOOTHING_H = 0.04
 
-DROPOUT = 0.5
-L2_REG = 5e-4
+DROPOUT = 0.6
+L2_REG = 1e-3
 
 THRESHOLD = 0.5
-CLASS_WEIGHTS_MULT_HEAD = 1.75
+CLASS_WEIGHTS_MULT_HEAD = 1.5
 
 DECAY = 1e-6
+
+lr_schedule = ExponentialDecay(
+    initial_learning_rate=LEARNING_RATE_HEAD,  # e.g. 5e-5
+    decay_steps=1000,                          # adjust as explained
+    decay_rate=0.9,                            # adjust as needed
+    staircase=True)
 
 # === PATHS ===
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}/head"
@@ -94,11 +101,11 @@ base_model.trainable = False
 for layer in base_model.layers:
     if isinstance(layer, tf.keras.layers.BatchNormalization):
         layer.trainable = False
-        
+
 print("[INFO] Base model frozen for head training.")
 
 model.compile(
-    optimizer=Adam(learning_rate=LEARNING_RATE_HEAD, decay=DECAY),
+    optimizer = Adam(learning_rate=lr_schedule),
     loss=tf.keras.losses.BinaryCrossentropy(from_logits=False, label_smoothing=LABEL_SMOOTHING_H),
     metrics=[
         tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),

@@ -11,6 +11,7 @@ from sklearn.utils.class_weight import compute_class_weight
 
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau, Callback
+from tensorflow.keras.optimizers.schedules import ExponentialDecay
 
 from model import build_model
 from data_loader import get_generators
@@ -32,6 +33,7 @@ L2_REG = 5e-4
 
 THRESHOLD = 0.5
 CLASS_WEIGHTS_MULT_FINE = 2
+
 
 # === PATHS ===
 output_dir = f"models/fine"
@@ -124,9 +126,15 @@ for idx, (unfreeze_percent, epochs, lr) in enumerate(zip(FINE_TUNE_UNFREEZE_PERC
     for layer in base_model.layers:
         if isinstance(layer, tf.keras.layers.BatchNormalization):
             layer.trainable = False
+    
+    lr_schedule = ExponentialDecay(
+        initial_learning_rate=lr,
+        decay_steps=1000,                         
+        decay_rate=0.9,                           
+        staircase=True)
 
     model.compile(
-        optimizer=Adam(learning_rate=lr),
+        optimizer = Adam(learning_rate=lr_schedule)
         loss=tf.keras.losses.BinaryCrossentropy(from_logits=False, label_smoothing=LABEL_SMOOTHING_F),
         metrics=[
             tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
