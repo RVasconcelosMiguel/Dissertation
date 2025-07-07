@@ -16,8 +16,8 @@ echo "=== Augmentation ==="
 
 
 # Run the training and evaluation scripts
-echo "=== TRAINING ==="
-python train_head.py | tee ../files_to_transfer/efficientnetb3/train_head_log.txt
+echo "=== TRAINING HEAD ==="
+python train_head.py | tee ../files_to_transfer/efficientnetb4/head/train_head_log.txt
 
 echo "=== EVALUATION ==="
-python evaluate.py | tee ../files_to_transfer/efficientnetb3/evaluate_log.txt
+#python evaluate.py | tee ../files_to_transfer/efficientnetb3/evaluate_log.txt
