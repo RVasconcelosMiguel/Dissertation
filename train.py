@@ -18,23 +18,23 @@ from plot_utils import plot_history
 # === CONFIGURATION ===
 model_name = "efficientnetb4"
 IMG_SIZE = 380
-BATCH_SIZE = 16
+BATCH_SIZE = 32
 
 EPOCHS_HEAD = 30
 EPOCHS_FINE_1 = 40
 
-LEARNING_RATE_HEAD = 3e-3
+LEARNING_RATE_HEAD = 1e-3
 LEARNING_RATE_FINE = 1e-4
 
-DROPOUT = 0.5
+DROPOUT = 0.6
 L2_REG = 5e-4
 
 THRESHOLD = 0.5
 LABEL_SMOOTHING_H = 0.05
-LABEL_SMOOTHING_F = 0.05
+LABEL_SMOOTHING_F = 0.1
 
 CLASS_WEIGHTS_MULT_HEAD = 1.75
-CLASS_WEIGHTS_MULT_FINE = 1.2
+CLASS_WEIGHTS_MULT_FINE = 2
 
 FINE_TUNE_STEPS = [0]  # Unfreeze all
 
@@ -107,14 +107,14 @@ model.summary()
 
 # === CALLBACKS ===
 callbacks_h = [
-    EarlyStopping(monitor="val_auc", mode="max", patience=10, restore_best_weights=True),
+    EarlyStopping(monitor="val_auc", mode="max", patience=3, restore_best_weights=True),
     ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
     ReduceLROnPlateau(monitor="val_auc", mode="max", factor=0.5, patience=5, min_lr=1e-7, verbose=1),
     RecallLogger()
 ]
 
 callbacks_f = [
-    EarlyStopping(monitor="val_auc", mode="max", patience=20, restore_best_weights=True),
+    EarlyStopping(monitor="val_auc", mode="max", patience=3, restore_best_weights=True),
     ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
     ReduceLROnPlateau(monitor="val_auc", mode="max", factor=0.5, patience=5, min_lr=1e-7, verbose=1),
     RecallLogger()
