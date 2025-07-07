@@ -20,14 +20,16 @@ BATCH_SIZE = 16
 
 # Head training configuration
 EPOCHS_HEAD = 60
-LEARNING_RATE_HEAD = 1e-4
-LABEL_SMOOTHING_H = 0.1
+LEARNING_RATE_HEAD = 5e-5
+LABEL_SMOOTHING_H = 0.04
 
 DROPOUT = 0.5
 L2_REG = 5e-4
 
 THRESHOLD = 0.5
-CLASS_WEIGHTS_MULT_HEAD = 3
+CLASS_WEIGHTS_MULT_HEAD = 1.75
+
+DECAY = 1e-6
 
 # === PATHS ===
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}/head"
@@ -80,7 +82,7 @@ model, base_model = build_model(model_name, img_size=IMG_SIZE, dropout=DROPOUT, 
 
 # === CALLBACKS ===
 callbacks_head = [
-    EarlyStopping(monitor="val_auc", mode="max", patience=16, restore_best_weights=True),
+    EarlyStopping(monitor="val_auc", mode="max", patience=12, restore_best_weights=True),
     ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
     ReduceLROnPlateau(monitor="val_auc", mode="max", factor=0.5, patience=4, min_lr=1e-7, verbose=1),
     RecallLogger()
@@ -88,10 +90,15 @@ callbacks_head = [
 
 # === HEAD TRAINING ===
 base_model.trainable = False
+
+for layer in base_model.layers:
+    if isinstance(layer, tf.keras.layers.BatchNormalization):
+        layer.trainable = False
+        
 print("[INFO] Base model frozen for head training.")
 
 model.compile(
-    optimizer=Adam(learning_rate=LEARNING_RATE_HEAD),
+    optimizer=Adam(learning_rate=LEARNING_RATE_HEAD, decay=DECAY),
     loss=tf.keras.losses.BinaryCrossentropy(from_logits=False, label_smoothing=LABEL_SMOOTHING_H),
     metrics=[
         tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
