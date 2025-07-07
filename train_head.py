@@ -91,7 +91,7 @@ model, base_model = build_model(model_name, img_size=IMG_SIZE, dropout=DROPOUT, 
 callbacks_head = [
     EarlyStopping(monitor="val_auc", mode="max", patience=12, restore_best_weights=True),
     ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
-    ReduceLROnPlateau(monitor="val_auc", mode="max", factor=0.5, patience=4, min_lr=1e-7, verbose=1),
+    #ReduceLROnPlateau(monitor="val_auc", mode="max", factor=0.5, patience=4, min_lr=1e-7, verbose=1),
     RecallLogger()
 ]
 
