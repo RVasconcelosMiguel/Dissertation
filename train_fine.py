@@ -11,7 +11,7 @@ from sklearn.metrics import roc_curve
 from sklearn.utils.class_weight import compute_class_weight
 
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, Callback
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, Callback, ReduceLROnPlateau
 from tensorflow.keras.optimizers.schedules import LearningRateSchedule
 
 from model import build_model
@@ -92,35 +92,18 @@ def optimize_temperature(val_probs, val_labels):
     )
     return opt_result.x[0], logits
 
-# === Warm-up + Decay SCHEDULER ===
-class WarmupThenDecaySchedule(LearningRateSchedule):
-    def __init__(self, base_lr, warmup_steps, decay_steps, decay_rate):
+# === DECAY SCHEDULER ===
+class DecaySchedule(LearningRateSchedule):
+    def __init__(self, base_lr, decay_steps, decay_rate):
         super().__init__()
         self.base_lr = base_lr
-        self.warmup_steps = tf.cast(warmup_steps, tf.float32)
-        self.decay_steps = tf.cast(decay_steps, tf.float32)
+        self.decay_steps = decay_steps
         self.decay_rate = decay_rate
 
     def __call__(self, step):
-        step = tf.cast(step, tf.float32)
-
-        warmup_lr = self.base_lr * (step / tf.maximum(self.warmup_steps, 1.0))
-        decay_step = tf.maximum(step - self.warmup_steps, 0.0)
-        decayed_lr = self.base_lr * tf.pow(self.decay_rate, decay_step / self.decay_steps)
-
-        lr = tf.cond(
-            step < self.warmup_steps,
-            lambda: warmup_lr,
-            lambda: decayed_lr
-        )
-
-        tf.print("[LR Scheduler] Step:", step, "LR:", lr,
-                 "Phase:", tf.cond(step < self.warmup_steps,
-                                   lambda: "Warm-up",
-                                   lambda: "Decay"))
+        lr = self.base_lr * tf.pow(self.decay_rate, step / self.decay_steps)
+        tf.print("[LR Scheduler] Step:", step, "LR:", lr)
         return lr
-
-
 
 # === DATA LOADING ===
 train_df, val_df, test_df, train_gen, val_gen, test_gen = get_generators(IMG_SIZE, BATCH_SIZE)
@@ -142,13 +125,15 @@ model.load_weights(HEAD_WEIGHTS_PATH)
 print("[DEBUG] Head weights loaded successfully.")
 
 # === CALLBACKS TEMPLATE ===
-callbacks_template = lambda: [
-    EarlyStopping(monitor="val_auc", mode="max", patience=5, restore_best_weights=True),
-    ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
-    RecallLogger()
-]
+def callbacks_template():
+    return [
+        EarlyStopping(monitor="val_auc", mode="max", patience=5, restore_best_weights=True),
+        ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
+        ReduceLROnPlateau(monitor="val_auc", factor=0.5, patience=3, verbose=1, mode="max", min_lr=1e-7),
+        RecallLogger()
+    ]
 
-# === GRADUAL FINE-TUNING WITH WARM-UP + DECAY ===
+# === GRADUAL FINE-TUNING WITH DECAY + ReduceLROnPlateau ===
 fine_histories = {}
 total_layers = len(base_model.layers)
 steps_per_epoch = len(train_gen)
@@ -165,14 +150,11 @@ for idx, (unfreeze_percent, epochs, lr) in enumerate(zip(FINE_TUNE_UNFREEZE_PERC
         if isinstance(layer, tf.keras.layers.BatchNormalization):
             layer.trainable = False if idx == 0 else True
 
-    warmup_epochs = 5
-    warmup_steps = warmup_epochs * steps_per_epoch
-    decay_steps = (epochs - warmup_epochs) * steps_per_epoch
-    decay_rate = 0.8  # your example decay rate
+    decay_steps = steps_per_epoch * epochs
+    decay_rate = 0.8
 
-    lr_schedule = WarmupThenDecaySchedule(
+    lr_schedule = DecaySchedule(
         base_lr=lr,
-        warmup_steps=warmup_steps,
         decay_steps=decay_steps,
         decay_rate=decay_rate
     )
@@ -190,14 +172,13 @@ for idx, (unfreeze_percent, epochs, lr) in enumerate(zip(FINE_TUNE_UNFREEZE_PERC
         ]
     )
 
-    print(f"[INFO] Starting fine-tuning stage {idx+1} with Warm-up + Decay scheduler...")
+    print(f"[INFO] Starting fine-tuning stage {idx+1} with Decay scheduler + ReduceLROnPlateau...")
     history_fine = model.fit(
         train_gen, validation_data=val_gen,
         epochs=epochs, callbacks=callbacks_template(),
         class_weight=class_weights_fine, verbose=1
     )
     fine_histories[f"fine_{idx+1}"] = history_fine.history
-
 
 # === SAVE HISTORY ===
 save_history(fine_histories, f"models/history_{model_name}_fine.pkl")
