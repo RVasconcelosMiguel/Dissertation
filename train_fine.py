@@ -129,6 +129,7 @@ class WarmUpAndDecaySchedule(LearningRateSchedule):
         self.warmup_start_lr = warmup_start_lr
 
     def __call__(self, step):
+        # Ramp up linearly to base_lr over warmup_steps, then decay
         warmup_lr = self.warmup_start_lr + (self.base_lr - self.warmup_start_lr) * \
             (tf.cast(step, tf.float32) / tf.cast(self.warmup_steps, tf.float32))
         decayed_lr = self.base_lr * tf.pow(self.decay_rate, (step - self.warmup_steps) / self.decay_steps)
@@ -138,6 +139,7 @@ class WarmUpAndDecaySchedule(LearningRateSchedule):
 fine_histories = {}
 total_layers = len(base_model.layers)
 steps_per_epoch = len(train_gen)
+warmup_epochs = 3
 
 for idx, (unfreeze_percent, epochs, lr) in enumerate(zip(FINE_TUNE_UNFREEZE_PERCENTS, FINE_TUNE_EPOCHS, FINE_TUNE_LRS)):
     fine_tune_at = int(total_layers * (1 - unfreeze_percent / 100))
@@ -151,16 +153,16 @@ for idx, (unfreeze_percent, epochs, lr) in enumerate(zip(FINE_TUNE_UNFREEZE_PERC
         if isinstance(layer, tf.keras.layers.BatchNormalization):
             layer.trainable = False if idx == 0 else True
 
-    warmup_steps = steps_per_epoch * 3  # First 3 epochs ramp up
-    decay_steps = steps_per_epoch * 10  # Decay over next 10 epochs
-    decay_rate = 0.9
+    warmup_steps = steps_per_epoch * warmup_epochs
+    decay_steps = steps_per_epoch * 5
+    decay_rate = 0.8
 
     lr_schedule = WarmUpAndDecaySchedule(
         base_lr=lr,
         warmup_steps=warmup_steps,
         decay_steps=decay_steps,
         decay_rate=decay_rate,
-        warmup_start_lr=lr * 0.1  # Start at 10% of base_lr
+        warmup_start_lr=lr * 0.1
     )
 
     model.compile(
