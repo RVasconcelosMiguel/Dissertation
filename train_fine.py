@@ -119,20 +119,24 @@ callbacks_template = lambda: [
     RecallLogger()
 ]
 
-# === WARMUP-ONLY SCHEDULER ===
-class WarmUpOnly(LearningRateSchedule):
-    def __init__(self, base_lr, warmup_steps):
+# === WARMUP + DECAY SCHEDULER ===
+class WarmUpAndDecaySchedule(LearningRateSchedule):
+    def __init__(self, base_lr, warmup_steps, decay_steps, decay_rate):
         super().__init__()
         self.base_lr = base_lr
         self.warmup_steps = warmup_steps
+        self.decay_steps = decay_steps
+        self.decay_rate = decay_rate
 
     def __call__(self, step):
         warmup_lr = self.base_lr * (tf.cast(step, tf.float32) / tf.cast(self.warmup_steps, tf.float32))
-        return tf.cond(step < self.warmup_steps, lambda: warmup_lr, lambda: self.base_lr)
+        decayed_lr = self.base_lr * tf.pow(self.decay_rate, (step - self.warmup_steps) / self.decay_steps)
+        return tf.cond(step < self.warmup_steps, lambda: warmup_lr, lambda: decayed_lr)
 
 # === GRADUAL FINE-TUNING ===
 fine_histories = {}
 total_layers = len(base_model.layers)
+steps_per_epoch = len(train_gen)
 
 for idx, (unfreeze_percent, epochs, lr) in enumerate(zip(FINE_TUNE_UNFREEZE_PERCENTS, FINE_TUNE_EPOCHS, FINE_TUNE_LRS)):
     fine_tune_at = int(total_layers * (1 - unfreeze_percent / 100))
@@ -147,9 +151,16 @@ for idx, (unfreeze_percent, epochs, lr) in enumerate(zip(FINE_TUNE_UNFREEZE_PERC
         if isinstance(layer, tf.keras.layers.BatchNormalization):
             layer.trainable = False if idx == 0 else True
 
-    warmup_steps = len(train_gen) * 2  # ≈2 epochs warmup
+    warmup_steps = steps_per_epoch * 2    # ~2 epochs warmup
+    decay_steps = steps_per_epoch * 10    # ~10 epochs decay
+    decay_rate = 0.9
 
-    lr_schedule = WarmUpOnly(base_lr=lr, warmup_steps=warmup_steps)
+    lr_schedule = WarmUpAndDecaySchedule(
+        base_lr=lr,
+        warmup_steps=warmup_steps,
+        decay_steps=decay_steps,
+        decay_rate=decay_rate
+    )
 
     model.compile(
         optimizer=Adam(learning_rate=lr_schedule),
@@ -162,7 +173,7 @@ for idx, (unfreeze_percent, epochs, lr) in enumerate(zip(FINE_TUNE_UNFREEZE_PERC
         ]
     )
 
-    print(f"[INFO] Starting fine-tuning stage {idx+1} with warmup...")
+    print(f"[INFO] Starting fine-tuning stage {idx+1} with warmup + decay scheduler...")
     history_fine = model.fit(
         train_gen, validation_data=val_gen,
         epochs=epochs, callbacks=callbacks_template(),
