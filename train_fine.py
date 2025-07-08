@@ -12,7 +12,7 @@ from sklearn.utils.class_weight import compute_class_weight
 
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, Callback
-from tensorflow.keras.optimizers.schedules import ExponentialDecay
+from tensorflow.keras.optimizers.schedules import LearningRateSchedule
 
 from model import build_model
 from data_loader import get_generators
@@ -29,7 +29,7 @@ model_name = "efficientnetb4"
 IMG_SIZE = 380
 BATCH_SIZE = 16
 
-# Fine-tuning configuration with recommended strategy
+# Fine-tuning configuration
 FINE_TUNE_UNFREEZE_PERCENTS = [10, 40, 100]
 FINE_TUNE_EPOCHS = [15, 20, 30]
 FINE_TUNE_LRS = [1e-5, 5e-6, 1e-6]
@@ -58,7 +58,7 @@ print("GPU available:", tf.config.list_physical_devices('GPU'))
 # === HELPER FUNCTIONS ===
 def print_distribution(name, df):
     counts = df['label'].astype(int).value_counts().sort_index()
-    print(f"[{name}] Class 0 : {counts.get(0, 0)} | Class 1: {counts.get(1, 0)}")
+    print(f"[{name}] Class 0: {counts.get(0, 0)} | Class 1: {counts.get(1, 0)}")
 
 def save_history(history, filename):
     with open(filename, "wb") as f:
@@ -119,7 +119,18 @@ callbacks_template = lambda: [
     RecallLogger()
 ]
 
-# === GRADUAL FINE-TUNING WITH WARMUP LR ===
+# === WARMUP-ONLY SCHEDULER ===
+class WarmUpOnly(LearningRateSchedule):
+    def __init__(self, base_lr, warmup_steps):
+        super().__init__()
+        self.base_lr = base_lr
+        self.warmup_steps = warmup_steps
+
+    def __call__(self, step):
+        warmup_lr = self.base_lr * (tf.cast(step, tf.float32) / tf.cast(self.warmup_steps, tf.float32))
+        return tf.cond(step < self.warmup_steps, lambda: warmup_lr, lambda: self.base_lr)
+
+# === GRADUAL FINE-TUNING ===
 fine_histories = {}
 total_layers = len(base_model.layers)
 
@@ -131,30 +142,14 @@ for idx, (unfreeze_percent, epochs, lr) in enumerate(zip(FINE_TUNE_UNFREEZE_PERC
     for layer in base_model.layers[:fine_tune_at]:
         layer.trainable = False
 
-    # Freeze BN layers only in stage 1
+    # Freeze BN layers only in Stage 1
     for layer in base_model.layers:
         if isinstance(layer, tf.keras.layers.BatchNormalization):
             layer.trainable = False if idx == 0 else True
 
-    # === Warmup LR scheduler ===
-    class WarmUpThenDecay(tf.keras.optimizers.schedules.LearningRateSchedule):
-        def __init__(self, base_lr, warmup_steps, decay_steps, decay_rate):
-            super().__init__()
-            self.base_lr = base_lr
-            self.warmup_steps = warmup_steps
-            self.decay_steps = decay_steps
-            self.decay_rate = decay_rate
+    warmup_steps = len(train_gen) * 2  # ≈2 epochs warmup
 
-        def __call__(self, step):
-            warmup_lr = self.base_lr * (tf.cast(step, tf.float32) / tf.cast(self.warmup_steps, tf.float32))
-            decayed_lr = self.base_lr * tf.pow(self.decay_rate, (step - self.warmup_steps) / self.decay_steps)
-            return tf.cond(step < self.warmup_steps, lambda: warmup_lr, lambda: decayed_lr)
-
-    warmup_steps = 5 * (len(train_gen))  # first 5 epochs warmup
-    decay_steps = {0: 100, 1: 200, 2: 300}[idx]
-    decay_rate = {0: 0.8, 1: 0.85, 2: 0.9}[idx]
-
-    lr_schedule = WarmUpThenDecay(base_lr=lr, warmup_steps=warmup_steps, decay_steps=decay_steps, decay_rate=decay_rate)
+    lr_schedule = WarmUpOnly(base_lr=lr, warmup_steps=warmup_steps)
 
     model.compile(
         optimizer=Adam(learning_rate=lr_schedule),
