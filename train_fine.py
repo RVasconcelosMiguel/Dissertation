@@ -166,8 +166,22 @@ for idx, (unfreeze_percent, epochs, lr) in enumerate(zip(FINE_TUNE_UNFREEZE_PERC
     decay_steps = steps_per_epoch * 5
     decay_rate = 0.8
 
+    # Compile with dummy schedule to initialize optimizer and retrieve step offset
+    dummy_schedule = tf.keras.optimizers.schedules.PiecewiseConstantDecay([0], [lr])
+    model.compile(
+        optimizer=Adam(learning_rate=dummy_schedule),
+        loss=tf.keras.losses.BinaryCrossentropy(from_logits=False, label_smoothing=LABEL_SMOOTHING_F),
+        metrics=[
+            tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
+            tf.keras.metrics.AUC(name="auc"),
+            tf.keras.metrics.Precision(name="precision", thresholds=THRESHOLD),
+            tf.keras.metrics.Recall(name="recall", thresholds=THRESHOLD),
+        ]
+    )
+
     step_offset = model.optimizer.iterations.numpy()
 
+    # Recreate schedule with step_offset and recompile
     lr_schedule = WarmUpAndDecaySchedule(
         base_lr=lr,
         warmup_steps=warmup_steps,
