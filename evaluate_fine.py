@@ -111,6 +111,8 @@ tn, fp, fn, tp = cm.ravel()
 specificity = tn / (tn + fp) if (tn + fp) > 0 else 0
 sensitivity = tp / (tp + fn) if (tp + fn) > 0 else 0
 print(f"Confusion Matrix: \n{cm}")
+print(f"Accuracy: {report['accuracy']:.4f}")
+print(f"AUC: {roc_auc:.4f}")
 print(f"Sensitivity (Recall): {sensitivity:.4f}")
 print(f"Specificity: {specificity:.4f}")
 
