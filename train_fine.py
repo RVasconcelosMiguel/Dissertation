@@ -31,8 +31,10 @@ FINE_TUNE_EPOCHS = 60
 FINE_TUNE_LR = 3e-5
 LABEL_SMOOTHING_F = 0.01
 
-DROPOUT = 0.6
-L2_REG = 1e-3
+DROPOUT_H = 0.6
+L2_REG_H = 1e-3
+DROPOUT_F= 0.4
+L2_REG_F = 1e-3
 
 THRESHOLD = 0.5
 CLASS_WEIGHTS_MULT_FINE = 1.5
@@ -101,7 +103,15 @@ class_weights_fine[1] *= CLASS_WEIGHTS_MULT_FINE
 print("Adjusted class weights (fine-tuning):", class_weights_fine)
 
 # === MODEL CONSTRUCTION ===
-model, base_model = build_model(model_name, img_size=IMG_SIZE, dropout=DROPOUT, l2_lambda=L2_REG)
+
+model, base_model = build_model(
+    model_name=model_name,
+    img_size=IMG_SIZE,
+    dropout_head=DROPOUT_H,       # dropout for your classifier head
+    dropout_base=DROPOUT_F,       # dropout for base feature extractor, e.g. EfficientNet backbone
+    l2_lambda_head=L2_REG_H,    # L2 for head
+    l2_lambda_base=L2_REG_F     # L2 for base model (usually lower)
+)
 
 # === LOAD HEAD WEIGHTS ===
 print(f"[INFO] Loading head-trained weights from: {HEAD_WEIGHTS_PATH}")
@@ -115,7 +125,7 @@ base_model.trainable = True
 # Keep most BN layers frozen, unfreeze last few for domain adaptation
 
 bn_layers = [layer for layer in base_model.layers if isinstance(layer, tf.keras.layers.BatchNormalization)]
-num_unfreeze = max(1, int(len(bn_layers) * 0.2))  # unfreeze last 20% of BN layers
+num_unfreeze = max(1, int(len(bn_layers) * 0.5))  # unfreeze last 20% of BN layers
 
 for layer in bn_layers[:-num_unfreeze]:
     layer.trainable = False
@@ -126,8 +136,8 @@ print(f"[INFO] Unfroze the last {num_unfreeze} BatchNormalization layers for ada
 
 lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
     initial_learning_rate=FINE_TUNE_LR,
-    decay_steps=100,
-    decay_rate=0.96,
+    decay_steps=200,
+    decay_rate=0.98,
     staircase=True
 )
 
