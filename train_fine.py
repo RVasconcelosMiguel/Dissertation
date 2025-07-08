@@ -27,10 +27,8 @@ random.seed(SEED)
 model_name = "efficientnetb4"
 IMG_SIZE = 380
 BATCH_SIZE = 16
-
-FINE_TUNE_UNFREEZE_PERCENTS = [10, 40, 100]
-FINE_TUNE_EPOCHS = [30, 30, 30]
-FINE_TUNE_LRS = [7e-5, 5e-6, 1e-6]
+FINE_TUNE_EPOCHS = 90  # Increased epochs for convergence
+FINE_TUNE_LR = 1e-6    # Recommended safe fine-tuning LR
 LABEL_SMOOTHING_F = 0.05
 
 DROPOUT = 0.6
@@ -110,57 +108,46 @@ print(f"[INFO] Loading head-trained weights from: {HEAD_WEIGHTS_PATH}")
 model.load_weights(HEAD_WEIGHTS_PATH)
 print("[DEBUG] Head weights loaded successfully.")
 
-# === CALLBACKS TEMPLATE ===
-def callbacks_template():
-    return [
-        EarlyStopping(monitor="val_auc", mode="max", patience=5, restore_best_weights=True),
-        ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
-        ReduceLROnPlateau(monitor="val_auc", factor=0.5, patience=3, verbose=1, mode="max", min_lr=1e-7),
-        RecallLogger()
+# === FULL FINE-TUNING SETUP ===
+base_model.trainable = True
+for layer in base_model.layers:
+    if isinstance(layer, tf.keras.layers.BatchNormalization):
+        layer.trainable = False  # keep BN layers frozen for stability
+
+optimizer = Adam(learning_rate=FINE_TUNE_LR)
+
+model.compile(
+    optimizer=optimizer,
+    loss=tf.keras.losses.BinaryCrossentropy(from_logits=False, label_smoothing=LABEL_SMOOTHING_F),
+    metrics=[
+        tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
+        tf.keras.metrics.AUC(name="auc"),
+        tf.keras.metrics.Precision(name="precision", thresholds=THRESHOLD),
+        tf.keras.metrics.Recall(name="recall", thresholds=THRESHOLD),
     ]
+)
 
-# === GRADUAL FINE-TUNING (NO WARMUP, DIRECT LR) ===
-fine_histories = {}
-total_layers = len(base_model.layers)
+# === CALLBACKS ===
+callbacks = [
+    EarlyStopping(monitor="val_auc", mode="max", patience=5, restore_best_weights=True),
+    ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
+    ReduceLROnPlateau(monitor="val_auc", factor=0.5, patience=3, verbose=1, mode="max", min_lr=1e-7),
+    RecallLogger()
+]
 
-for idx, (unfreeze_percent, epochs, lr) in enumerate(zip(FINE_TUNE_UNFREEZE_PERCENTS, FINE_TUNE_EPOCHS, FINE_TUNE_LRS)):
-    fine_tune_at = int(total_layers * (1 - unfreeze_percent / 100))
-    print(f"[INFO] Fine-tuning stage {idx+1}: unfreezing last {unfreeze_percent}% of layers ({total_layers - fine_tune_at}/{total_layers} layers), lr={lr}")
-
-    base_model.trainable = True
-    for layer in base_model.layers[:fine_tune_at]:
-        layer.trainable = False
-
-    for layer in base_model.layers:
-        if isinstance(layer, tf.keras.layers.BatchNormalization):
-            layer.trainable = False if idx == 0 else True
-
-    optimizer = Adam(learning_rate=lr)
-
-    model.compile(
-        optimizer=optimizer,
-        loss=tf.keras.losses.BinaryCrossentropy(from_logits=False, label_smoothing=LABEL_SMOOTHING_F),
-        metrics=[
-            tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
-            tf.keras.metrics.AUC(name="auc"),
-            tf.keras.metrics.Precision(name="precision", thresholds=THRESHOLD),
-            tf.keras.metrics.Recall(name="recall", thresholds=THRESHOLD),
-        ]
-    )
-
-    print(f"[INFO] Starting fine-tuning stage {idx+1}...")
-    history_fine = model.fit(
-        train_gen, validation_data=val_gen,
-        epochs=epochs, callbacks=callbacks_template(),
-        class_weight=class_weights_fine, verbose=1
-    )
-    fine_histories[f"fine_{idx+1}"] = history_fine.history
+# === FULL FINE-TUNING TRAINING ===
+print("[INFO] Starting full fine-tuning...")
+history_fine = model.fit(
+    train_gen, validation_data=val_gen,
+    epochs=FINE_TUNE_EPOCHS, callbacks=callbacks,
+    class_weight=class_weights_fine, verbose=1
+)
 
 # === SAVE HISTORY ===
-save_history(fine_histories, f"models/history_{model_name}_fine.pkl")
+save_history(history_fine.history, f"models/history_{model_name}_fine.pkl")
 
 # === PLOTTING ===
-plot_history(fine_histories, save_path=output_dir, metrics=["accuracy", "loss", "auc", "precision", "recall"])
+plot_history(history_fine.history, save_path=output_dir, metrics=["accuracy", "loss", "auc", "precision", "recall"])
 
 # === TEMPERATURE SCALING ===
 print("[INFO] Starting temperature scaling calibration...")
