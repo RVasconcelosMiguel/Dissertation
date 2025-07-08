@@ -1,4 +1,5 @@
 # === evaluate_finetune.py ===
+
 import os
 import time
 import tensorflow as tf
@@ -23,16 +24,30 @@ WEIGHTS_PATH = f"models/{model_name}_fine_weights"
 threshold_path = os.path.join(output_dir, "optimal_threshold_val.txt")
 
 # === Silence TensorFlow logging ===
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Suppresses INFO and WARNING (keep '3' to suppress everything)
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
+# Optional: suppress TensorRT warnings if not using TF-TRT
+tf.get_logger().setLevel('ERROR')
+
+# === Check GPU availability ===
+gpus = tf.config.list_physical_devices('GPU')
+if gpus:
+    print(f"[INFO] GPU(s) detected: {[gpu.name for gpu in gpus]}")
+else:
+    print("[WARNING] No GPU detected. Evaluation will run on CPU.")
+
+# === Start evaluation ===
 start_time = time.time()
 print(f"[INFO] Fine-tuned model evaluation started at: {time.ctime(start_time)}")
 
-# === Load saved optimal threshold from validation ===
-with open(threshold_path, "r") as f:
-    optimal_threshold = float(f.read().strip())
-print(f"[INFO] Loaded optimal threshold: {optimal_threshold:.4f}")
+# === Load saved optimal threshold ===
+try:
+    with open(threshold_path, "r") as f:
+        optimal_threshold = float(f.read().strip())
+    print(f"[INFO] Loaded optimal threshold: {optimal_threshold:.4f}")
+except FileNotFoundError:
+    raise FileNotFoundError(f"Optimal threshold file not found at {threshold_path}")
 
 # === Data Loading ===
 _, _, _, _, val_gen, test_gen = get_generators(IMG_SIZE, BATCH_SIZE)
@@ -50,11 +65,12 @@ model, _ = build_model(
 print(f"[INFO] Loading fine-tuned weights from: {WEIGHTS_PATH}")
 if not os.path.exists(WEIGHTS_PATH + ".index"):
     raise FileNotFoundError(f"Missing weights: {WEIGHTS_PATH}.index")
-model.load_weights(WEIGHTS_PATH)
+status = model.load_weights(WEIGHTS_PATH)
+status.expect_partial()  # Suppress optimizer state warnings (we only load weights for evaluation)
 
 # === Predict on Test Set ===
 print("[INFO] Predicting on test set...")
-y_prob = model.predict(test_gen).flatten()
+y_prob = model.predict(test_gen, verbose=1).flatten()
 y_true = np.array(test_gen.classes)
 
 # === Generate ROC Curve ===
@@ -91,6 +107,7 @@ conf_matrix_path = os.path.join(output_dir, "confusion_matrix_finetune.png")
 save_confusion_matrix(y_true, y_pred, labels, conf_matrix_path)
 print(f"[INFO] Confusion matrix saved to {conf_matrix_path}")
 
+# === End evaluation ===
 end_time = time.time()
 duration = end_time - start_time
 print(f"[INFO] Evaluation completed at: {time.ctime(end_time)}")
