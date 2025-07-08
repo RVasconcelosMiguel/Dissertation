@@ -92,24 +92,31 @@ def optimize_temperature(val_probs, val_labels):
     )
     return opt_result.x[0], logits
 
-# === WARM-UP + DECAY SCHEDULER ===
+# === WARM-UP + DECAY SCHEDULER (Corrected) ===
 class WarmUpThenDecay(LearningRateSchedule):
     def __init__(self, warmup_steps, base_lr, decay_steps, decay_rate):
         super().__init__()
-        self.warmup_steps = warmup_steps
-        self.base_lr = base_lr
-        self.decay_steps = decay_steps
-        self.decay_rate = decay_rate
+        self.warmup_steps = tf.cast(warmup_steps, tf.float32)
+        self.base_lr = tf.cast(base_lr, tf.float32)
+        self.decay_steps = tf.cast(decay_steps, tf.float32)
+        self.decay_rate = tf.cast(decay_rate, tf.float32)
 
     def __call__(self, step):
-        if step < self.warmup_steps:
+        step = tf.cast(step, tf.float32)
+
+        def warmup_phase():
             lr = self.base_lr * (step / self.warmup_steps)
             tf.print("[LR Scheduler] Step:", step, "LR:", lr, "Phase: Warm-up")
-        else:
+            return lr
+
+        def decay_phase():
             decay_step = step - self.warmup_steps
             lr = self.base_lr * tf.pow(self.decay_rate, decay_step / self.decay_steps)
             tf.print("[LR Scheduler] Step:", step, "LR:", lr, "Phase: Decay")
-        return lr
+            return lr
+
+        return tf.cond(step < self.warmup_steps, warmup_phase, decay_phase)
+
 
 # === DATA LOADING ===
 train_df, val_df, test_df, train_gen, val_gen, test_gen = get_generators(IMG_SIZE, BATCH_SIZE)
