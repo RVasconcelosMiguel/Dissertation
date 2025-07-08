@@ -13,7 +13,7 @@ from sklearn.utils.class_weight import compute_class_weight
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, Callback
 
-from model import build_model
+from model_fine import build_model
 from data_loader import get_generators
 from plot_utils import plot_history_finetune_stages
 
