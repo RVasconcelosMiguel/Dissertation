@@ -30,9 +30,9 @@ IMG_SIZE = 380
 BATCH_SIZE = 16
 
 FINE_TUNE_UNFREEZE_PERCENTS = [10, 40, 100]
-FINE_TUNE_EPOCHS = [15, 20, 30]
+FINE_TUNE_EPOCHS = [30, 30, 30]
 FINE_TUNE_LRS = [7e-5, 5e-6, 1e-6]
-LABEL_SMOOTHING_F = 0
+LABEL_SMOOTHING_F = 0.05
 
 DROPOUT = 0.6
 L2_REG = 1e-3
@@ -113,12 +113,12 @@ print("[DEBUG] Head weights loaded successfully.")
 
 # === CALLBACKS TEMPLATE ===
 callbacks_template = lambda: [
-    EarlyStopping(monitor="val_auc", mode="max", patience=15, restore_best_weights=True),
+    EarlyStopping(monitor="val_auc", mode="max", patience=5, restore_best_weights=True),
     ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
     RecallLogger()
 ]
 
-# === WARMUP + DECAY SCHEDULER ===
+# === WARMUP + DECAY SCHEDULER WITH PRINTS ===
 class WarmUpAndDecaySchedule(LearningRateSchedule):
     def __init__(self, base_lr, warmup_steps, decay_steps, decay_rate, warmup_start_lr):
         super().__init__()
@@ -129,11 +129,16 @@ class WarmUpAndDecaySchedule(LearningRateSchedule):
         self.warmup_start_lr = warmup_start_lr
 
     def __call__(self, step):
-        # Ramp up linearly to base_lr over warmup_steps, then decay
         warmup_lr = self.warmup_start_lr + (self.base_lr - self.warmup_start_lr) * \
             (tf.cast(step, tf.float32) / tf.cast(self.warmup_steps, tf.float32))
         decayed_lr = self.base_lr * tf.pow(self.decay_rate, (step - self.warmup_steps) / self.decay_steps)
-        return tf.cond(step < self.warmup_steps, lambda: warmup_lr, lambda: decayed_lr)
+        lr = tf.cond(step < self.warmup_steps, lambda: warmup_lr, lambda: decayed_lr)
+        
+        # Print statement to track learning rate at each step
+        tf.print("[LR Scheduler] Step:", step, 
+                 "LR:", lr, 
+                 "Phase:", "Warmup" if step < self.warmup_steps else "Decay")
+        return lr
 
 # === GRADUAL FINE-TUNING ===
 fine_histories = {}
