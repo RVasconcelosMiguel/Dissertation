@@ -30,4 +30,4 @@ echo "=== TRAINING FINE ==="
 python train_fine.py | tee ../files_to_transfer/efficientnetb4/fine/train_fine_log.txt
 
 echo "=== EVALUATION HEAD ==="
-python evaluate_fine.py | tee ../files_to_transfer/efficientnetb4/fine/evaluate_fine_log.txt
+#python evaluate_fine.py | tee ../files_to_transfer/efficientnetb4/fine/evaluate_fine_log.txt

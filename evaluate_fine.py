@@ -5,7 +5,7 @@ import time
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.metrics import classification_report, roc_auc_score
+from sklearn.metrics import classification_report, roc_auc_score, confusion_matrix
 
 from model import build_model
 from data_loader import get_generators
@@ -24,10 +24,8 @@ WEIGHTS_PATH = f"models/{model_name}_fine_weights"
 threshold_path = os.path.join(output_dir, "optimal_threshold_val.txt")
 
 # === Silence TensorFlow logging ===
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Suppresses INFO and WARNING (keep '3' to suppress everything)
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-
-# Optional: suppress TensorRT warnings if not using TF-TRT
 tf.get_logger().setLevel('ERROR')
 
 # === Check GPU availability ===
@@ -66,7 +64,7 @@ print(f"[INFO] Loading fine-tuned weights from: {WEIGHTS_PATH}")
 if not os.path.exists(WEIGHTS_PATH + ".index"):
     raise FileNotFoundError(f"Missing weights: {WEIGHTS_PATH}.index")
 status = model.load_weights(WEIGHTS_PATH)
-status.expect_partial()  # Suppress optimizer state warnings (we only load weights for evaluation)
+status.expect_partial()
 
 # === Predict on Test Set ===
 print("[INFO] Predicting on test set...")
@@ -74,7 +72,6 @@ y_prob = model.predict(test_gen, verbose=1).flatten()
 y_true = np.array(test_gen.classes)
 
 # === Generate ROC Curve ===
-print("[INFO] Generating ROC curve...")
 roc_curve_path = os.path.join(output_dir, "roc_curve_test_finetune.png")
 save_roc_curve(y_true, y_prob, roc_curve_path)
 roc_auc = roc_auc_score(y_true, y_prob)
@@ -82,7 +79,6 @@ print(f"[INFO] ROC curve saved to {roc_curve_path}")
 print(f"[INFO] Test ROC AUC: {roc_auc:.4f}")
 
 # === Save prediction probability histogram ===
-print("[INFO] Saving prediction probability histogram...")
 plt.figure(figsize=(8,6))
 plt.hist(y_prob, bins=50, color='skyblue', edgecolor='black')
 plt.title("Fine-tuned Test Prediction Probabilities")
@@ -93,14 +89,30 @@ plt.savefig(hist_path)
 plt.close()
 print(f"[INFO] Histogram saved to {hist_path}")
 
-# === Threshold-based Predictions and Classification Report ===
-print("[INFO] Generating classification report...")
+# === Threshold-based Predictions ===
 y_pred = (y_prob >= optimal_threshold).astype(int)
 labels = list(test_gen.class_indices.keys())
 
-report = classification_report(y_true, y_pred, target_names=labels, digits=4)
+# === Classification Report ===
 print("[INFO] Classification report:")
-print(report)
+report = classification_report(y_true, y_pred, target_names=labels, digits=4, output_dict=True)
+
+for cls in labels:
+    metrics = report[cls]
+    print(f"Class '{cls}': Precision={metrics['precision']:.4f}, Recall={metrics['recall']:.4f}, F1-score={metrics['f1-score']:.4f}, Support={metrics['support']}")
+
+print(f"Overall Accuracy: {report['accuracy']:.4f}")
+print(f"Macro Average: Precision={report['macro avg']['precision']:.4f}, Recall={report['macro avg']['recall']:.4f}, F1-score={report['macro avg']['f1-score']:.4f}")
+print(f"Weighted Average: Precision={report['weighted avg']['precision']:.4f}, Recall={report['weighted avg']['recall']:.4f}, F1-score={report['weighted avg']['f1-score']:.4f}")
+
+# === Confusion Matrix and Derived Metrics ===
+cm = confusion_matrix(y_true, y_pred)
+tn, fp, fn, tp = cm.ravel()
+specificity = tn / (tn + fp) if (tn + fp) > 0 else 0
+sensitivity = tp / (tp + fn) if (tp + fn) > 0 else 0
+print(f"Confusion Matrix: \n{cm}")
+print(f"Sensitivity (Recall): {sensitivity:.4f}")
+print(f"Specificity: {specificity:.4f}")
 
 # === Save Confusion Matrix ===
 conf_matrix_path = os.path.join(output_dir, "confusion_matrix_finetune.png")
