@@ -18,7 +18,7 @@ from model import build_model
 from data_loader import get_generators
 from plot_utils import plot_history
 
-# === SEED FOR REPRODUIBILITY ===
+# === SEED FOR REPRODUCIBILITY ===
 SEED = 42
 tf.random.set_seed(SEED)
 np.random.seed(SEED)
@@ -92,7 +92,7 @@ def optimize_temperature(val_probs, val_labels):
     )
     return opt_result.x[0], logits
 
-# === WARM-UP + COSINE DECAY SCHEDULER (Corrected) ===
+# === WARM-UP + COSINE DECAY SCHEDULER ===
 class WarmUpCosineDecay(LearningRateSchedule):
     def __init__(self, base_lr, total_steps, warmup_steps, warmup_lr=0.0):
         super().__init__()
@@ -103,17 +103,12 @@ class WarmUpCosineDecay(LearningRateSchedule):
 
     def __call__(self, step):
         step = tf.cast(step, tf.float32)
-
-        # Warm-up phase
         warmup_lr = self.warmup_lr + (self.base_lr - self.warmup_lr) * (step / self.warmup_steps)
-        # Cosine decay phase
         decay_steps = self.total_steps - self.warmup_steps
         decay_step = tf.minimum(step - self.warmup_steps, decay_steps)
         cosine_decay = 0.5 * (1 + tf.cos(tf.constant(np.pi) * decay_step / decay_steps))
         decayed_lr = self.base_lr * cosine_decay
-
         lr = tf.where(step < self.warmup_steps, warmup_lr, decayed_lr)
-
         tf.print("[LR Scheduler] Step:", step, "LR:", lr, "Phase:", tf.where(step < self.warmup_steps, "Warm-up", "Decay"))
         return lr
 
@@ -172,8 +167,11 @@ for idx, (unfreeze_percent, epochs, lr) in enumerate(zip(FINE_TUNE_UNFREEZE_PERC
         warmup_lr=0.0
     )
 
+    # === RE-INSTANTIATE OPTIMIZER TO RESET ITERATIONS EACH STAGE ===
+    optimizer = Adam(learning_rate=lr_schedule)
+
     model.compile(
-        optimizer=Adam(learning_rate=lr_schedule),
+        optimizer=optimizer,
         loss=tf.keras.losses.BinaryCrossentropy(from_logits=False, label_smoothing=LABEL_SMOOTHING_F),
         metrics=[
             tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
