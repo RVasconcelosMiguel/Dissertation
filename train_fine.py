@@ -129,9 +129,9 @@ model.compile(
 
 # === CALLBACKS ===
 callbacks = [
-    EarlyStopping(monitor="val_auc", mode="max", patience=5, restore_best_weights=True),
+    EarlyStopping(monitor="val_auc", mode="max", patience=12, restore_best_weights=True),
     ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
-    ReduceLROnPlateau(monitor="val_auc", factor=0.5, patience=3, verbose=1, mode="max", min_lr=1e-7),
+    #ReduceLROnPlateau(monitor="val_auc", factor=0.5, patience=3, verbose=1, mode="max", min_lr=1e-7),
     RecallLogger()
 ]
 
