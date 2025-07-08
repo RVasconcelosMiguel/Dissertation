@@ -32,7 +32,7 @@ BATCH_SIZE = 16
 # Fine-tuning configuration
 FINE_TUNE_UNFREEZE_PERCENTS = [10, 40, 100]
 FINE_TUNE_EPOCHS = [15, 20, 30]
-FINE_TUNE_LRS = [2e-5, 5e-6, 1e-6]
+FINE_TUNE_LRS = [5e-5, 5e-6, 1e-6]
 LABEL_SMOOTHING_F = 0
 
 DROPOUT = 0.6
@@ -151,7 +151,7 @@ for idx, (unfreeze_percent, epochs, lr) in enumerate(zip(FINE_TUNE_UNFREEZE_PERC
         if isinstance(layer, tf.keras.layers.BatchNormalization):
             layer.trainable = False if idx == 0 else True
 
-    warmup_steps = steps_per_epoch * 1    # ~2 epochs warmup
+    warmup_steps = steps_per_epoch * 3 
     decay_steps = steps_per_epoch * 10    # ~10 epochs decay
     decay_rate = 0.9
 
