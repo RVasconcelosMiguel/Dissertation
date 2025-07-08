@@ -97,21 +97,17 @@ class WarmupThenDecaySchedule(LearningRateSchedule):
     def __init__(self, base_lr, warmup_steps, decay_steps, decay_rate):
         super().__init__()
         self.base_lr = base_lr
-        self.warmup_steps = warmup_steps
-        self.decay_steps = decay_steps
+        self.warmup_steps = tf.cast(warmup_steps, tf.float32)
+        self.decay_steps = tf.cast(decay_steps, tf.float32)
         self.decay_rate = decay_rate
 
     def __call__(self, step):
         step = tf.cast(step, tf.float32)
 
-        # Warm-up phase: linear increase from 0 to base_lr
         warmup_lr = self.base_lr * (step / tf.maximum(self.warmup_steps, 1.0))
-
-        # Decay phase: exponential decay starting from base_lr
         decay_step = tf.maximum(step - self.warmup_steps, 0.0)
         decayed_lr = self.base_lr * tf.pow(self.decay_rate, decay_step / self.decay_steps)
 
-        # Combine
         lr = tf.cond(
             step < self.warmup_steps,
             lambda: warmup_lr,
@@ -123,6 +119,7 @@ class WarmupThenDecaySchedule(LearningRateSchedule):
                                    lambda: "Warm-up",
                                    lambda: "Decay"))
         return lr
+
 
 
 # === DATA LOADING ===
