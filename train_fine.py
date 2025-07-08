@@ -92,30 +92,38 @@ def optimize_temperature(val_probs, val_labels):
     )
     return opt_result.x[0], logits
 
-# === WARM-UP + COSINE DECAY SCHEDULER (corrected) ===
-class WarmUpCosineDecay(LearningRateSchedule):
-    def __init__(self, base_lr, total_steps, warmup_steps, warmup_lr=0.0):
+# === Warm-up + Decay SCHEDULER ===
+class WarmupThenDecaySchedule(LearningRateSchedule):
+    def __init__(self, base_lr, warmup_steps, decay_steps, decay_rate):
         super().__init__()
-        self.base_lr = tf.cast(base_lr, tf.float32)
-        self.total_steps = tf.cast(total_steps, tf.float32)
-        self.warmup_steps = tf.cast(warmup_steps, tf.float32)
-        self.warmup_lr = tf.cast(warmup_lr, tf.float32)
+        self.base_lr = base_lr
+        self.warmup_steps = warmup_steps
+        self.decay_steps = decay_steps
+        self.decay_rate = decay_rate
 
     def __call__(self, step):
         step = tf.cast(step, tf.float32)
 
-        # Adjust step to scheduler-local step counter
-        local_step = tf.where(step >= self.total_steps, self.total_steps - 1, step)
+        # Warm-up phase: linear increase from 0 to base_lr
+        warmup_lr = self.base_lr * (step / tf.maximum(self.warmup_steps, 1.0))
 
-        warmup_lr = self.warmup_lr + (self.base_lr - self.warmup_lr) * (local_step / self.warmup_steps)
-        decay_steps = self.total_steps - self.warmup_steps
-        decay_step = tf.maximum(local_step - self.warmup_steps, 0.0)
-        cosine_decay = 0.5 * (1 + tf.cos(tf.constant(np.pi) * decay_step / decay_steps))
-        decayed_lr = self.base_lr * cosine_decay
+        # Decay phase: exponential decay starting from base_lr
+        decay_step = tf.maximum(step - self.warmup_steps, 0.0)
+        decayed_lr = self.base_lr * tf.pow(self.decay_rate, decay_step / self.decay_steps)
 
-        lr = tf.where(local_step < self.warmup_steps, warmup_lr, decayed_lr)
-        tf.print("[LR Scheduler] Local Step:", local_step, "LR:", lr, "Phase:", tf.where(local_step < self.warmup_steps, "Warm-up", "Decay"))
+        # Combine
+        lr = tf.cond(
+            step < self.warmup_steps,
+            lambda: warmup_lr,
+            lambda: decayed_lr
+        )
+
+        tf.print("[LR Scheduler] Step:", step, "LR:", lr,
+                 "Phase:", tf.cond(step < self.warmup_steps,
+                                   lambda: "Warm-up",
+                                   lambda: "Decay"))
         return lr
+
 
 # === DATA LOADING ===
 train_df, val_df, test_df, train_gen, val_gen, test_gen = get_generators(IMG_SIZE, BATCH_SIZE)
@@ -143,7 +151,7 @@ callbacks_template = lambda: [
     RecallLogger()
 ]
 
-# === GRADUAL FINE-TUNING WITH WARM-UP + COSINE DECAY ===
+# === GRADUAL FINE-TUNING WITH WARM-UP + DECAY ===
 fine_histories = {}
 total_layers = len(base_model.layers)
 steps_per_epoch = len(train_gen)
@@ -160,25 +168,20 @@ for idx, (unfreeze_percent, epochs, lr) in enumerate(zip(FINE_TUNE_UNFREEZE_PERC
         if isinstance(layer, tf.keras.layers.BatchNormalization):
             layer.trainable = False if idx == 0 else True
 
-    total_steps = steps_per_epoch * epochs
-    warmup_steps = int(0.1 * total_steps)  # 10% warm-up
+    warmup_epochs = 5
+    warmup_steps = warmup_epochs * steps_per_epoch
+    decay_steps = (epochs - warmup_epochs) * steps_per_epoch
+    decay_rate = 0.8  # your example decay rate
 
-    print(f"[DEBUG] Warm-up steps: {warmup_steps} | Total steps: {total_steps}")
-
-    # === Re-instantiate optimizer each stage to reset iterations ===
-    optimizer = Adam()
-
-    lr_schedule = WarmUpCosineDecay(
+    lr_schedule = WarmupThenDecaySchedule(
         base_lr=lr,
-        total_steps=total_steps,
         warmup_steps=warmup_steps,
-        warmup_lr=0.0
+        decay_steps=decay_steps,
+        decay_rate=decay_rate
     )
 
-    # === Apply scheduler to optimizer learning rate ===
-    optimizer.learning_rate = lr_schedule
+    optimizer = Adam(learning_rate=lr_schedule)
 
-    # === Compile model with fresh optimizer ===
     model.compile(
         optimizer=optimizer,
         loss=tf.keras.losses.BinaryCrossentropy(from_logits=False, label_smoothing=LABEL_SMOOTHING_F),
@@ -190,13 +193,14 @@ for idx, (unfreeze_percent, epochs, lr) in enumerate(zip(FINE_TUNE_UNFREEZE_PERC
         ]
     )
 
-    print(f"[INFO] Starting fine-tuning stage {idx+1} with Warm-up + Cosine Decay scheduler...")
+    print(f"[INFO] Starting fine-tuning stage {idx+1} with Warm-up + Decay scheduler...")
     history_fine = model.fit(
         train_gen, validation_data=val_gen,
         epochs=epochs, callbacks=callbacks_template(),
         class_weight=class_weights_fine, verbose=1
     )
     fine_histories[f"fine_{idx+1}"] = history_fine.history
+
 
 # === SAVE HISTORY ===
 save_history(fine_histories, f"models/history_{model_name}_fine.pkl")
