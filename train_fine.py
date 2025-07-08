@@ -29,7 +29,6 @@ model_name = "efficientnetb4"
 IMG_SIZE = 380
 BATCH_SIZE = 16
 
-# Fine-tuning configuration
 FINE_TUNE_UNFREEZE_PERCENTS = [10, 40, 100]
 FINE_TUNE_EPOCHS = [15, 20, 30]
 FINE_TUNE_LRS = [5e-5, 5e-6, 1e-6]
@@ -121,15 +120,17 @@ callbacks_template = lambda: [
 
 # === WARMUP + DECAY SCHEDULER ===
 class WarmUpAndDecaySchedule(LearningRateSchedule):
-    def __init__(self, base_lr, warmup_steps, decay_steps, decay_rate):
+    def __init__(self, base_lr, warmup_steps, decay_steps, decay_rate, warmup_start_lr):
         super().__init__()
         self.base_lr = base_lr
         self.warmup_steps = warmup_steps
         self.decay_steps = decay_steps
         self.decay_rate = decay_rate
+        self.warmup_start_lr = warmup_start_lr
 
     def __call__(self, step):
-        warmup_lr = self.base_lr * (tf.cast(step, tf.float32) / tf.cast(self.warmup_steps, tf.float32))
+        warmup_lr = self.warmup_start_lr + (self.base_lr - self.warmup_start_lr) * \
+            (tf.cast(step, tf.float32) / tf.cast(self.warmup_steps, tf.float32))
         decayed_lr = self.base_lr * tf.pow(self.decay_rate, (step - self.warmup_steps) / self.decay_steps)
         return tf.cond(step < self.warmup_steps, lambda: warmup_lr, lambda: decayed_lr)
 
@@ -146,20 +147,20 @@ for idx, (unfreeze_percent, epochs, lr) in enumerate(zip(FINE_TUNE_UNFREEZE_PERC
     for layer in base_model.layers[:fine_tune_at]:
         layer.trainable = False
 
-    # Freeze BN layers only in Stage 1
     for layer in base_model.layers:
         if isinstance(layer, tf.keras.layers.BatchNormalization):
             layer.trainable = False if idx == 0 else True
 
-    warmup_steps = steps_per_epoch * 3 
-    decay_steps = steps_per_epoch * 10    # ~10 epochs decay
+    warmup_steps = steps_per_epoch * 3  # First 3 epochs ramp up
+    decay_steps = steps_per_epoch * 10  # Decay over next 10 epochs
     decay_rate = 0.9
 
     lr_schedule = WarmUpAndDecaySchedule(
         base_lr=lr,
         warmup_steps=warmup_steps,
         decay_steps=decay_steps,
-        decay_rate=decay_rate
+        decay_rate=decay_rate,
+        warmup_start_lr=lr * 0.1  # Start at 10% of base_lr
     )
 
     model.compile(
