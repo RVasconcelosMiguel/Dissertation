@@ -27,9 +27,9 @@ random.seed(SEED)
 model_name = "efficientnetb4"
 IMG_SIZE = 380
 BATCH_SIZE = 16
-FINE_TUNE_EPOCHS = 15
-FINE_TUNE_LR = 1e-6
-LABEL_SMOOTHING_F = 0.05
+FINE_TUNE_EPOCHS = 60
+FINE_TUNE_LR = 3e-5
+LABEL_SMOOTHING_F = 0.01
 
 DROPOUT = 0.6
 L2_REG = 1e-3
@@ -110,9 +110,19 @@ print("[DEBUG] Head weights loaded successfully.")
 
 # === FINE-TUNING SETUP ===
 base_model.trainable = True
-for layer in base_model.layers:
-    if isinstance(layer, tf.keras.layers.BatchNormalization):
-        layer.trainable = False
+
+# === Unfreeze only selected BatchNormalization layers ===
+# Keep most BN layers frozen, unfreeze last few for domain adaptation
+
+bn_layers = [layer for layer in base_model.layers if isinstance(layer, tf.keras.layers.BatchNormalization)]
+num_unfreeze = max(1, int(len(bn_layers) * 0.2))  # unfreeze last 20% of BN layers
+
+for layer in bn_layers[:-num_unfreeze]:
+    layer.trainable = False
+for layer in bn_layers[-num_unfreeze:]:
+    layer.trainable = True
+
+print(f"[INFO] Unfroze the last {num_unfreeze} BatchNormalization layers for adaptation.")
 
 optimizer = Adam(learning_rate=FINE_TUNE_LR)
 
@@ -146,8 +156,6 @@ history_fine = model.fit(
 save_history(history_fine.history, f"models/history_{model_name}_fine.pkl")
 
 # === PLOT METRICS ===
-from plot_utils import plot_history_finetune_stages
-
 plot_history_finetune_stages(
     {'fine_tune': history_fine.history},
     save_path=output_dir,
