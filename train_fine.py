@@ -113,7 +113,7 @@ print("[DEBUG] Head weights loaded successfully.")
 
 # === CALLBACKS TEMPLATE ===
 callbacks_template = lambda: [
-    EarlyStopping(monitor="val_auc", mode="max", patience=5, restore_best_weights=True),
+    EarlyStopping(monitor="val_auc", mode="max", patience=15, restore_best_weights=True),
     ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
     RecallLogger()
 ]
