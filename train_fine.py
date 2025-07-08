@@ -118,28 +118,30 @@ callbacks_template = lambda: [
     RecallLogger()
 ]
 
-# === WARMUP + DECAY SCHEDULER WITH GRAPH-SAFE PRINTS ===
+# === WARMUP + DECAY SCHEDULER WITH STEP OFFSET ===
 class WarmUpAndDecaySchedule(LearningRateSchedule):
-    def __init__(self, base_lr, warmup_steps, decay_steps, decay_rate, warmup_start_lr):
+    def __init__(self, base_lr, warmup_steps, decay_steps, decay_rate, warmup_start_lr, step_offset=0):
         super().__init__()
         self.base_lr = base_lr
         self.warmup_steps = warmup_steps
         self.decay_steps = decay_steps
         self.decay_rate = decay_rate
         self.warmup_start_lr = warmup_start_lr
+        self.step_offset = step_offset
 
     def __call__(self, step):
+        relative_step = step - self.step_offset
         warmup_lr = self.warmup_start_lr + (self.base_lr - self.warmup_start_lr) * \
-            (tf.cast(step, tf.float32) / tf.cast(self.warmup_steps, tf.float32))
-        decayed_lr = self.base_lr * tf.pow(self.decay_rate, (step - self.warmup_steps) / self.decay_steps)
-        lr = tf.cond(step < self.warmup_steps, lambda: warmup_lr, lambda: decayed_lr)
+            (tf.cast(relative_step, tf.float32) / tf.cast(self.warmup_steps, tf.float32))
+        decayed_lr = self.base_lr * tf.pow(self.decay_rate, (relative_step - self.warmup_steps) / self.decay_steps)
+        lr = tf.cond(relative_step < self.warmup_steps, lambda: warmup_lr, lambda: decayed_lr)
 
         phase = tf.cond(
-            step < self.warmup_steps,
+            relative_step < self.warmup_steps,
             lambda: tf.constant("Warmup"),
             lambda: tf.constant("Decay")
         )
-        tf.print("[LR Scheduler] Step:", step, "LR:", lr, "Phase:", phase)
+        tf.print("[LR Scheduler] Global Step:", step, "Relative Step:", relative_step, "LR:", lr, "Phase:", phase)
         return lr
 
 # === GRADUAL FINE-TUNING ===
@@ -164,12 +166,15 @@ for idx, (unfreeze_percent, epochs, lr) in enumerate(zip(FINE_TUNE_UNFREEZE_PERC
     decay_steps = steps_per_epoch * 5
     decay_rate = 0.8
 
+    step_offset = model.optimizer.iterations.numpy()
+
     lr_schedule = WarmUpAndDecaySchedule(
         base_lr=lr,
         warmup_steps=warmup_steps,
         decay_steps=decay_steps,
         decay_rate=decay_rate,
-        warmup_start_lr=lr * 0.1
+        warmup_start_lr=lr * 0.1,
+        step_offset=step_offset
     )
 
     model.compile(
