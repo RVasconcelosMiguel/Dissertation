@@ -118,7 +118,7 @@ callbacks_template = lambda: [
     RecallLogger()
 ]
 
-# === WARMUP + DECAY SCHEDULER WITH PRINTS ===
+# === WARMUP + DECAY SCHEDULER WITH GRAPH-SAFE PRINTS ===
 class WarmUpAndDecaySchedule(LearningRateSchedule):
     def __init__(self, base_lr, warmup_steps, decay_steps, decay_rate, warmup_start_lr):
         super().__init__()
@@ -133,11 +133,13 @@ class WarmUpAndDecaySchedule(LearningRateSchedule):
             (tf.cast(step, tf.float32) / tf.cast(self.warmup_steps, tf.float32))
         decayed_lr = self.base_lr * tf.pow(self.decay_rate, (step - self.warmup_steps) / self.decay_steps)
         lr = tf.cond(step < self.warmup_steps, lambda: warmup_lr, lambda: decayed_lr)
-        
-        # Print statement to track learning rate at each step
-        tf.print("[LR Scheduler] Step:", step, 
-                 "LR:", lr, 
-                 "Phase:", "Warmup" if step < self.warmup_steps else "Decay")
+
+        phase = tf.cond(
+            step < self.warmup_steps,
+            lambda: tf.constant("Warmup"),
+            lambda: tf.constant("Decay")
+        )
+        tf.print("[LR Scheduler] Step:", step, "LR:", lr, "Phase:", phase)
         return lr
 
 # === GRADUAL FINE-TUNING ===
