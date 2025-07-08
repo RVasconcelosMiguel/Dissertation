@@ -18,7 +18,7 @@ from model import build_model
 from data_loader import get_generators
 from plot_utils import plot_history
 
-# === SEED FOR REPRODUCIBILITY ===
+# === SEED FOR REPRODUIBILITY ===
 SEED = 42
 tf.random.set_seed(SEED)
 np.random.seed(SEED)
@@ -48,7 +48,7 @@ HEAD_WEIGHTS_PATH = f"models/{model_name}_head_weights"
 
 # === ENVIRONMENT SETUP ===
 start_time = time.time()
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 print("TensorFlow version:", tf.__version__)
@@ -92,31 +92,30 @@ def optimize_temperature(val_probs, val_labels):
     )
     return opt_result.x[0], logits
 
-# === WARM-UP + DECAY SCHEDULER (Corrected) ===
-class WarmUpThenDecay(LearningRateSchedule):
-    def __init__(self, warmup_steps, base_lr, decay_steps, decay_rate):
+# === WARM-UP + COSINE DECAY SCHEDULER (Corrected) ===
+class WarmUpCosineDecay(LearningRateSchedule):
+    def __init__(self, base_lr, total_steps, warmup_steps, warmup_lr=0.0):
         super().__init__()
-        self.warmup_steps = tf.cast(warmup_steps, tf.float32)
-        self.base_lr = tf.cast(base_lr, tf.float32)
-        self.decay_steps = tf.cast(decay_steps, tf.float32)
-        self.decay_rate = tf.cast(decay_rate, tf.float32)
+        self.base_lr = base_lr
+        self.total_steps = total_steps
+        self.warmup_steps = warmup_steps
+        self.warmup_lr = warmup_lr
 
     def __call__(self, step):
         step = tf.cast(step, tf.float32)
 
-        def warmup_phase():
-            lr = self.base_lr * (step / self.warmup_steps)
-            tf.print("[LR Scheduler] Step:", step, "LR:", lr, "Phase: Warm-up")
-            return lr
+        # Warm-up phase
+        warmup_lr = self.warmup_lr + (self.base_lr - self.warmup_lr) * (step / self.warmup_steps)
+        # Cosine decay phase
+        decay_steps = self.total_steps - self.warmup_steps
+        decay_step = tf.minimum(step - self.warmup_steps, decay_steps)
+        cosine_decay = 0.5 * (1 + tf.cos(tf.constant(np.pi) * decay_step / decay_steps))
+        decayed_lr = self.base_lr * cosine_decay
 
-        def decay_phase():
-            decay_step = step - self.warmup_steps
-            lr = self.base_lr * tf.pow(self.decay_rate, decay_step / self.decay_steps)
-            tf.print("[LR Scheduler] Step:", step, "LR:", lr, "Phase: Decay")
-            return lr
+        lr = tf.where(step < self.warmup_steps, warmup_lr, decayed_lr)
 
-        return tf.cond(step < self.warmup_steps, warmup_phase, decay_phase)
-
+        tf.print("[LR Scheduler] Step:", step, "LR:", lr, "Phase:", tf.where(step < self.warmup_steps, "Warm-up", "Decay"))
+        return lr
 
 # === DATA LOADING ===
 train_df, val_df, test_df, train_gen, val_gen, test_gen = get_generators(IMG_SIZE, BATCH_SIZE)
@@ -144,7 +143,7 @@ callbacks_template = lambda: [
     RecallLogger()
 ]
 
-# === GRADUAL FINE-TUNING WITH WARM-UP + DECAY ===
+# === GRADUAL FINE-TUNING WITH WARM-UP + COSINE DECAY ===
 fine_histories = {}
 total_layers = len(base_model.layers)
 steps_per_epoch = len(train_gen)
@@ -161,19 +160,16 @@ for idx, (unfreeze_percent, epochs, lr) in enumerate(zip(FINE_TUNE_UNFREEZE_PERC
         if isinstance(layer, tf.keras.layers.BatchNormalization):
             layer.trainable = False if idx == 0 else True
 
-    # === LR SCHEDULER PARAMETERS ===
-    warmup_epochs = 2
-    warmup_steps = steps_per_epoch * warmup_epochs
-    decay_steps = steps_per_epoch * (epochs - warmup_epochs)
-    decay_rate = 0.9
+    total_steps = steps_per_epoch * epochs
+    warmup_steps = int(0.1 * total_steps)  # 10% warm-up
 
-    print(f"[DEBUG] Warm-up steps: {warmup_steps} | Decay steps: {decay_steps}")
+    print(f"[DEBUG] Warm-up steps: {warmup_steps} | Total steps: {total_steps}")
 
-    lr_schedule = WarmUpThenDecay(
-        warmup_steps=warmup_steps,
+    lr_schedule = WarmUpCosineDecay(
         base_lr=lr,
-        decay_steps=decay_steps,
-        decay_rate=decay_rate
+        total_steps=total_steps,
+        warmup_steps=warmup_steps,
+        warmup_lr=0.0
     )
 
     model.compile(
@@ -187,7 +183,7 @@ for idx, (unfreeze_percent, epochs, lr) in enumerate(zip(FINE_TUNE_UNFREEZE_PERC
         ]
     )
 
-    print(f"[INFO] Starting fine-tuning stage {idx+1} with Warm-up + Decay scheduler...")
+    print(f"[INFO] Starting fine-tuning stage {idx+1} with Warm-up + Cosine Decay scheduler...")
     history_fine = model.fit(
         train_gen, validation_data=val_gen,
         epochs=epochs, callbacks=callbacks_template(),
