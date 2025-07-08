@@ -12,7 +12,6 @@ from sklearn.utils.class_weight import compute_class_weight
 
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, Callback, ReduceLROnPlateau
-from tensorflow.keras.optimizers.schedules import LearningRateSchedule
 
 from model import build_model
 from data_loader import get_generators
@@ -92,19 +91,6 @@ def optimize_temperature(val_probs, val_labels):
     )
     return opt_result.x[0], logits
 
-# === DECAY SCHEDULER ===
-class DecaySchedule(LearningRateSchedule):
-    def __init__(self, base_lr, decay_steps, decay_rate):
-        super().__init__()
-        self.base_lr = base_lr
-        self.decay_steps = decay_steps
-        self.decay_rate = decay_rate
-
-    def __call__(self, step):
-        lr = self.base_lr * tf.pow(self.decay_rate, step / self.decay_steps)
-        tf.print("[LR Scheduler] Step:", step, "LR:", lr)
-        return lr
-
 # === DATA LOADING ===
 train_df, val_df, test_df, train_gen, val_gen, test_gen = get_generators(IMG_SIZE, BATCH_SIZE)
 print_distribution("Train", train_df)
@@ -133,14 +119,13 @@ def callbacks_template():
         RecallLogger()
     ]
 
-# === GRADUAL FINE-TUNING WITH DECAY + ReduceLROnPlateau ===
+# === GRADUAL FINE-TUNING (NO WARMUP, DIRECT LR) ===
 fine_histories = {}
 total_layers = len(base_model.layers)
-steps_per_epoch = len(train_gen)
 
 for idx, (unfreeze_percent, epochs, lr) in enumerate(zip(FINE_TUNE_UNFREEZE_PERCENTS, FINE_TUNE_EPOCHS, FINE_TUNE_LRS)):
     fine_tune_at = int(total_layers * (1 - unfreeze_percent / 100))
-    print(f"[INFO] Fine-tuning stage {idx+1}: unfreezing last {unfreeze_percent}% of layers ({total_layers - fine_tune_at}/{total_layers} layers), base_lr={lr}")
+    print(f"[INFO] Fine-tuning stage {idx+1}: unfreezing last {unfreeze_percent}% of layers ({total_layers - fine_tune_at}/{total_layers} layers), lr={lr}")
 
     base_model.trainable = True
     for layer in base_model.layers[:fine_tune_at]:
@@ -150,16 +135,7 @@ for idx, (unfreeze_percent, epochs, lr) in enumerate(zip(FINE_TUNE_UNFREEZE_PERC
         if isinstance(layer, tf.keras.layers.BatchNormalization):
             layer.trainable = False if idx == 0 else True
 
-    decay_steps = steps_per_epoch * epochs
-    decay_rate = 0.8
-
-    lr_schedule = DecaySchedule(
-        base_lr=lr,
-        decay_steps=decay_steps,
-        decay_rate=decay_rate
-    )
-
-    optimizer = Adam(learning_rate=lr_schedule)
+    optimizer = Adam(learning_rate=lr)
 
     model.compile(
         optimizer=optimizer,
@@ -172,7 +148,7 @@ for idx, (unfreeze_percent, epochs, lr) in enumerate(zip(FINE_TUNE_UNFREEZE_PERC
         ]
     )
 
-    print(f"[INFO] Starting fine-tuning stage {idx+1} with Decay scheduler + ReduceLROnPlateau...")
+    print(f"[INFO] Starting fine-tuning stage {idx+1}...")
     history_fine = model.fit(
         train_gen, validation_data=val_gen,
         epochs=epochs, callbacks=callbacks_template(),
