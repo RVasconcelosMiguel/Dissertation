@@ -11,7 +11,7 @@ from sklearn.metrics import roc_curve
 from sklearn.utils.class_weight import compute_class_weight
 
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau, Callback
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, Callback
 from tensorflow.keras.optimizers.schedules import ExponentialDecay
 
 from model import build_model
@@ -86,7 +86,6 @@ def nll_loss(T, logits, labels):
     return loss
 
 def optimize_temperature(val_probs, val_labels):
-    # Convert probs to logits before scaling
     logits = np.log(val_probs / (1 - val_probs))
     opt_result = minimize(
         nll_loss, x0=[1.0], args=(logits, val_labels),
@@ -108,15 +107,30 @@ print("Adjusted class weights (fine-tuning):", class_weights_fine)
 # === MODEL CONSTRUCTION ===
 model, base_model = build_model(model_name, img_size=IMG_SIZE, dropout=DROPOUT, l2_lambda=L2_REG)
 
+# === VERIFY ARCHITECTURE CONSISTENCY ===
+print(f"[INFO] Verifying architecture consistency before loading weights.")
+print(f"[INFO] Dropout used: {DROPOUT}, L2 regularization: {L2_REG}")
+
 # === LOAD HEAD WEIGHTS ===
 print(f"[INFO] Loading head-trained weights from: {HEAD_WEIGHTS_PATH}")
 model.load_weights(HEAD_WEIGHTS_PATH)
+print("[DEBUG] Weights loaded successfully.")
+
+# === VERIFY LOADED WEIGHTS (dense layer means/stds) ===
+for layer in model.layers:
+    if isinstance(layer, tf.keras.layers.Dense):
+        weights, biases = layer.get_weights()
+        print(f"[DEBUG] Dense layer '{layer.name}' weights mean: {np.mean(weights):.6f}, std: {np.std(weights):.6f}")
+
+# === SAMPLE PREDICTIONS CHECK ===
+sample_imgs, _ = next(iter(val_gen))
+sample_preds = model.predict(sample_imgs)
+print("[DEBUG] Sample predictions after loading head weights (first 5):", sample_preds[:5].flatten())
 
 # === CALLBACKS TEMPLATE ===
 callbacks_template = lambda: [
     EarlyStopping(monitor="val_auc", mode="max", patience=12, restore_best_weights=True),
     ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
-    #ReduceLROnPlateau(monitor="val_auc", mode="max", factor=0.5, patience=4, min_lr=1e-7, verbose=1),
     RecallLogger()
 ]
 
@@ -134,13 +148,10 @@ for idx, (unfreeze_percent, epochs, lr) in enumerate(zip(FINE_TUNE_UNFREEZE_PERC
 
     for layer in base_model.layers:
         if isinstance(layer, tf.keras.layers.BatchNormalization):
-            layer.trainable = True  # keep BN layers adaptive
+            layer.trainable = True
 
-    decay_steps_dict = {0: 100, 1: 200, 2: 300}
-    decay_rate_dict = {0: 0.8, 1: 0.85, 2: 0.9}
-
-    decay_steps = decay_steps_dict[idx]
-    decay_rate = decay_rate_dict[idx]
+    decay_steps = {0: 100, 1: 200, 2: 300}[idx]
+    decay_rate = {0: 0.8, 1: 0.85, 2: 0.9}[idx]
 
     lr_schedule = ExponentialDecay(
         initial_learning_rate=lr,

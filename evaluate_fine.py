@@ -16,10 +16,10 @@ IMG_SIZE = 380
 BATCH_SIZE = 16
 
 # === Paths ===
-output_dir = f"models/fine"
+output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}/fine"
 os.makedirs(output_dir, exist_ok=True)
 
-WEIGHTS_PATH = f"{output_dir}/{model_name}_fine_weights"
+WEIGHTS_PATH = f"models/{model_name}_fine_weights"
 threshold_path = os.path.join(output_dir, "optimal_threshold_val.txt")
 
 # === Silence TensorFlow logging ===
