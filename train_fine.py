@@ -92,24 +92,29 @@ def optimize_temperature(val_probs, val_labels):
     )
     return opt_result.x[0], logits
 
-# === WARM-UP + COSINE DECAY SCHEDULER ===
+# === WARM-UP + COSINE DECAY SCHEDULER (corrected) ===
 class WarmUpCosineDecay(LearningRateSchedule):
     def __init__(self, base_lr, total_steps, warmup_steps, warmup_lr=0.0):
         super().__init__()
-        self.base_lr = base_lr
-        self.total_steps = total_steps
-        self.warmup_steps = warmup_steps
-        self.warmup_lr = warmup_lr
+        self.base_lr = tf.cast(base_lr, tf.float32)
+        self.total_steps = tf.cast(total_steps, tf.float32)
+        self.warmup_steps = tf.cast(warmup_steps, tf.float32)
+        self.warmup_lr = tf.cast(warmup_lr, tf.float32)
 
     def __call__(self, step):
         step = tf.cast(step, tf.float32)
-        warmup_lr = self.warmup_lr + (self.base_lr - self.warmup_lr) * (step / self.warmup_steps)
+
+        # Adjust step to scheduler-local step counter
+        local_step = tf.where(step >= self.total_steps, self.total_steps - 1, step)
+
+        warmup_lr = self.warmup_lr + (self.base_lr - self.warmup_lr) * (local_step / self.warmup_steps)
         decay_steps = self.total_steps - self.warmup_steps
-        decay_step = tf.minimum(step - self.warmup_steps, decay_steps)
+        decay_step = tf.maximum(local_step - self.warmup_steps, 0.0)
         cosine_decay = 0.5 * (1 + tf.cos(tf.constant(np.pi) * decay_step / decay_steps))
         decayed_lr = self.base_lr * cosine_decay
-        lr = tf.where(step < self.warmup_steps, warmup_lr, decayed_lr)
-        tf.print("[LR Scheduler] Step:", step, "LR:", lr, "Phase:", tf.where(step < self.warmup_steps, "Warm-up", "Decay"))
+
+        lr = tf.where(local_step < self.warmup_steps, warmup_lr, decayed_lr)
+        tf.print("[LR Scheduler] Local Step:", local_step, "LR:", lr, "Phase:", tf.where(local_step < self.warmup_steps, "Warm-up", "Decay"))
         return lr
 
 # === DATA LOADING ===
@@ -160,6 +165,9 @@ for idx, (unfreeze_percent, epochs, lr) in enumerate(zip(FINE_TUNE_UNFREEZE_PERC
 
     print(f"[DEBUG] Warm-up steps: {warmup_steps} | Total steps: {total_steps}")
 
+    # === Re-instantiate optimizer each stage to reset iterations ===
+    optimizer = Adam()
+
     lr_schedule = WarmUpCosineDecay(
         base_lr=lr,
         total_steps=total_steps,
@@ -167,9 +175,10 @@ for idx, (unfreeze_percent, epochs, lr) in enumerate(zip(FINE_TUNE_UNFREEZE_PERC
         warmup_lr=0.0
     )
 
-    # === RE-INSTANTIATE OPTIMIZER TO RESET ITERATIONS EACH STAGE ===
-    optimizer = Adam(learning_rate=lr_schedule)
+    # === Apply scheduler to optimizer learning rate ===
+    optimizer.learning_rate = lr_schedule
 
+    # === Compile model with fresh optimizer ===
     model.compile(
         optimizer=optimizer,
         loss=tf.keras.losses.BinaryCrossentropy(from_logits=False, label_smoothing=LABEL_SMOOTHING_F),
