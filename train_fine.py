@@ -124,7 +124,14 @@ for layer in bn_layers[-num_unfreeze:]:
 
 print(f"[INFO] Unfroze the last {num_unfreeze} BatchNormalization layers for adaptation.")
 
-optimizer = Adam(learning_rate=FINE_TUNE_LR)
+lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+    initial_learning_rate=FINE_TUNE_LR,
+    decay_steps=100,
+    decay_rate=0.96,
+    staircase=True
+)
+
+optimizer = Adam(learning_rate=lr_schedule)
 
 model.compile(
     optimizer=optimizer,
