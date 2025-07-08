@@ -89,6 +89,43 @@ def plot_history_head(history, save_path, metrics):
         print(f"[DEBUG] Saved head {metric} plot to {metric_save_path}")
         plt.close()
 
+def plot_history_finetune_stages(histories, save_path, metrics):
+    """
+    Plot training and validation metrics for each fine-tuning stage separately.
+
+    Args:
+        histories (dict): Dictionary containing histories per fine-tuning stage.
+        save_path (str): Directory path to save plots.
+        metrics (list): List of metric names to plot.
+    """
+    os.makedirs(save_path, exist_ok=True)
+
+    for metric in metrics:
+        for stage_key, history in histories.items():
+            plt.figure(figsize=(8, 6))
+            history_dict = history.history if hasattr(history, "history") else history
+
+            train_metric = history_dict.get(metric, [])
+            val_metric = history_dict.get(f"val_{metric}", [])
+
+            if train_metric:
+                plt.plot(range(len(train_metric)), train_metric, label="train")
+            if val_metric:
+                plt.plot(range(len(val_metric)), val_metric, label="val")
+
+            plt.title(f"{stage_key.capitalize()} {metric.capitalize()} Curve")
+            plt.xlabel("Epoch")
+            plt.ylabel(metric.capitalize())
+            plt.legend()
+            plt.grid(True)
+
+            metric_filename = f"{metric}_{stage_key}_curve.png"
+            metric_save_path = os.path.join(save_path, metric_filename)
+            plt.savefig(metric_save_path)
+            print(f"[DEBUG] Saved {metric} plot for {stage_key} to {metric_save_path}")
+            plt.close()
+
+
 
 def save_confusion_matrix(y_true, y_pred, labels, save_path):
     os.makedirs(os.path.dirname(save_path), exist_ok=True)

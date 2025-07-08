@@ -11,11 +11,11 @@ from sklearn.metrics import roc_curve
 from sklearn.utils.class_weight import compute_class_weight
 
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, Callback, ReduceLROnPlateau
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, Callback
 
 from model import build_model
 from data_loader import get_generators
-from plot_utils import plot_history
+from plot_utils import plot_history_finetune_stages
 
 # === SEED FOR REPRODUCIBILITY ===
 SEED = 42
@@ -27,8 +27,8 @@ random.seed(SEED)
 model_name = "efficientnetb4"
 IMG_SIZE = 380
 BATCH_SIZE = 16
-FINE_TUNE_EPOCHS = 90  # Increased epochs for convergence
-FINE_TUNE_LR = 1e-6    # Recommended safe fine-tuning LR
+FINE_TUNE_EPOCHS = 90
+FINE_TUNE_LR = 1e-6
 LABEL_SMOOTHING_F = 0.05
 
 DROPOUT = 0.6
@@ -95,7 +95,7 @@ print_distribution("Train", train_df)
 print_distribution("Validation", val_df)
 print_distribution("Test", test_df)
 
-# === CLASS WEIGHTS FINE-TUNING ===
+# === CLASS WEIGHTS ===
 class_weights_fine = compute_class_weights(train_df)
 class_weights_fine[1] *= CLASS_WEIGHTS_MULT_FINE
 print("Adjusted class weights (fine-tuning):", class_weights_fine)
@@ -108,11 +108,11 @@ print(f"[INFO] Loading head-trained weights from: {HEAD_WEIGHTS_PATH}")
 model.load_weights(HEAD_WEIGHTS_PATH)
 print("[DEBUG] Head weights loaded successfully.")
 
-# === FULL FINE-TUNING SETUP ===
+# === FINE-TUNING SETUP ===
 base_model.trainable = True
 for layer in base_model.layers:
     if isinstance(layer, tf.keras.layers.BatchNormalization):
-        layer.trainable = False  # keep BN layers frozen for stability
+        layer.trainable = False
 
 optimizer = Adam(learning_rate=FINE_TUNE_LR)
 
@@ -131,11 +131,10 @@ model.compile(
 callbacks = [
     EarlyStopping(monitor="val_auc", mode="max", patience=12, restore_best_weights=True),
     ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
-    #ReduceLROnPlateau(monitor="val_auc", factor=0.5, patience=3, verbose=1, mode="max", min_lr=1e-7),
     RecallLogger()
 ]
 
-# === FULL FINE-TUNING TRAINING ===
+# === TRAINING ===
 print("[INFO] Starting full fine-tuning...")
 history_fine = model.fit(
     train_gen, validation_data=val_gen,
@@ -146,8 +145,14 @@ history_fine = model.fit(
 # === SAVE HISTORY ===
 save_history(history_fine.history, f"models/history_{model_name}_fine.pkl")
 
-# === PLOTTING ===
-plot_history(history_fine.history, save_path=output_dir, metrics=["accuracy", "loss", "auc", "precision", "recall"])
+# === PLOT METRICS ===
+from plot_utils import plot_history_finetune_stages
+
+plot_history_finetune_stages(
+    {'fine_tune': history_fine.history},
+    save_path=output_dir,
+    metrics=["accuracy", "loss", "auc", "precision", "recall"]
+)
 
 # === TEMPERATURE SCALING ===
 print("[INFO] Starting temperature scaling calibration...")
