@@ -144,6 +144,14 @@ class WarmUpAndDecaySchedule(LearningRateSchedule):
         tf.print("[LR Scheduler] Global Step:", step, "Relative Step:", relative_step, "LR:", lr, "Phase:", phase)
         return lr
 
+# === DUMMY CONSTANT SCHEDULE ===
+class DummyConstantSchedule(LearningRateSchedule):
+    def __init__(self, lr):
+        super().__init__()
+        self.lr = lr
+    def __call__(self, step):
+        return self.lr
+
 # === GRADUAL FINE-TUNING ===
 fine_histories = {}
 total_layers = len(base_model.layers)
@@ -166,8 +174,8 @@ for idx, (unfreeze_percent, epochs, lr) in enumerate(zip(FINE_TUNE_UNFREEZE_PERC
     decay_steps = steps_per_epoch * 5
     decay_rate = 0.8
 
-    # Compile with dummy schedule to initialize optimizer and retrieve step offset
-    dummy_schedule = tf.keras.optimizers.schedules.PiecewiseConstantDecay([0], [lr])
+    # Compile with dummy constant schedule to initialize optimizer and retrieve step_offset
+    dummy_schedule = DummyConstantSchedule(lr)
     model.compile(
         optimizer=Adam(learning_rate=dummy_schedule),
         loss=tf.keras.losses.BinaryCrossentropy(from_logits=False, label_smoothing=LABEL_SMOOTHING_F),
@@ -178,7 +186,6 @@ for idx, (unfreeze_percent, epochs, lr) in enumerate(zip(FINE_TUNE_UNFREEZE_PERC
             tf.keras.metrics.Recall(name="recall", thresholds=THRESHOLD),
         ]
     )
-
     step_offset = model.optimizer.iterations.numpy()
 
     # Recreate schedule with step_offset and recompile
