@@ -29,17 +29,17 @@ model_name = "efficientnetb4"
 IMG_SIZE = 380
 BATCH_SIZE = 16
 
-# Fine-tuning configuration (3 phases)
-FINE_TUNE_UNFREEZE_PERCENTS = [20, 50, 100]
+# Fine-tuning configuration with recommended strategy
+FINE_TUNE_UNFREEZE_PERCENTS = [10, 40, 100]
 FINE_TUNE_EPOCHS = [15, 20, 30]
-FINE_TUNE_LRS = [5e-5, 2e-5, 1e-5]
+FINE_TUNE_LRS = [1e-5, 5e-6, 1e-6]
 LABEL_SMOOTHING_F = 0
 
 DROPOUT = 0.6
 L2_REG = 1e-3
 
 THRESHOLD = 0.5
-CLASS_WEIGHTS_MULT_FINE = 2.25
+CLASS_WEIGHTS_MULT_FINE = 1.5
 
 # === PATHS ===
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}/fine"
@@ -107,25 +107,10 @@ print("Adjusted class weights (fine-tuning):", class_weights_fine)
 # === MODEL CONSTRUCTION ===
 model, base_model = build_model(model_name, img_size=IMG_SIZE, dropout=DROPOUT, l2_lambda=L2_REG)
 
-# === VERIFY ARCHITECTURE CONSISTENCY ===
-print(f"[INFO] Verifying architecture consistency before loading weights.")
-print(f"[INFO] Dropout used: {DROPOUT}, L2 regularization: {L2_REG}")
-
 # === LOAD HEAD WEIGHTS ===
 print(f"[INFO] Loading head-trained weights from: {HEAD_WEIGHTS_PATH}")
 model.load_weights(HEAD_WEIGHTS_PATH)
-print("[DEBUG] Weights loaded successfully.")
-
-# === VERIFY LOADED WEIGHTS (dense layer means/stds) ===
-for layer in model.layers:
-    if isinstance(layer, tf.keras.layers.Dense):
-        weights, biases = layer.get_weights()
-        print(f"[DEBUG] Dense layer '{layer.name}' weights mean: {np.mean(weights):.6f}, std: {np.std(weights):.6f}")
-
-# === SAMPLE PREDICTIONS CHECK ===
-sample_imgs, _ = next(iter(val_gen))
-sample_preds = model.predict(sample_imgs)
-print("[DEBUG] Sample predictions after loading head weights (first 5):", sample_preds[:5].flatten())
+print("[DEBUG] Head weights loaded successfully.")
 
 # === CALLBACKS TEMPLATE ===
 callbacks_template = lambda: [
@@ -134,7 +119,7 @@ callbacks_template = lambda: [
     RecallLogger()
 ]
 
-# === GRADUAL FINE-TUNING ===
+# === GRADUAL FINE-TUNING WITH WARMUP LR ===
 fine_histories = {}
 total_layers = len(base_model.layers)
 
@@ -146,18 +131,30 @@ for idx, (unfreeze_percent, epochs, lr) in enumerate(zip(FINE_TUNE_UNFREEZE_PERC
     for layer in base_model.layers[:fine_tune_at]:
         layer.trainable = False
 
+    # Freeze BN layers only in stage 1
     for layer in base_model.layers:
         if isinstance(layer, tf.keras.layers.BatchNormalization):
-            layer.trainable = True
+            layer.trainable = False if idx == 0 else True
 
+    # === Warmup LR scheduler ===
+    class WarmUpThenDecay(tf.keras.optimizers.schedules.LearningRateSchedule):
+        def __init__(self, base_lr, warmup_steps, decay_steps, decay_rate):
+            super().__init__()
+            self.base_lr = base_lr
+            self.warmup_steps = warmup_steps
+            self.decay_steps = decay_steps
+            self.decay_rate = decay_rate
+
+        def __call__(self, step):
+            warmup_lr = self.base_lr * (tf.cast(step, tf.float32) / tf.cast(self.warmup_steps, tf.float32))
+            decayed_lr = self.base_lr * tf.pow(self.decay_rate, (step - self.warmup_steps) / self.decay_steps)
+            return tf.cond(step < self.warmup_steps, lambda: warmup_lr, lambda: decayed_lr)
+
+    warmup_steps = 5 * (len(train_gen))  # first 5 epochs warmup
     decay_steps = {0: 100, 1: 200, 2: 300}[idx]
     decay_rate = {0: 0.8, 1: 0.85, 2: 0.9}[idx]
 
-    lr_schedule = ExponentialDecay(
-        initial_learning_rate=lr,
-        decay_steps=decay_steps,
-        decay_rate=decay_rate,
-        staircase=True)
+    lr_schedule = WarmUpThenDecay(base_lr=lr, warmup_steps=warmup_steps, decay_steps=decay_steps, decay_rate=decay_rate)
 
     model.compile(
         optimizer=Adam(learning_rate=lr_schedule),
@@ -170,7 +167,7 @@ for idx, (unfreeze_percent, epochs, lr) in enumerate(zip(FINE_TUNE_UNFREEZE_PERC
         ]
     )
 
-    print(f"[INFO] Starting fine-tuning stage {idx+1}...")
+    print(f"[INFO] Starting fine-tuning stage {idx+1} with warmup...")
     history_fine = model.fit(
         train_gen, validation_data=val_gen,
         epochs=epochs, callbacks=callbacks_template(),
