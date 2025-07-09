@@ -138,4 +138,4 @@ def build_model(model_name, img_size, dropout_head, dropout_base, l2_lambda_head
     elif model_name == "custom_cnn":
         return build_custom_cnn(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base)
     else:
-        raise ValueError(f"Unsupported model name: {model_name}")
+        raise ValueError(f"Unsupported model name : {model_name}")
