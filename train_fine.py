@@ -32,13 +32,13 @@ FINE_TUNE_EPOCHS = 60
 FINE_TUNE_LR = 3e-5
 LABEL_SMOOTHING_F = 0.01
 
-DROPOUT_H = 0.6   # keep consistent with head
+DROPOUT_H = 0.6
 L2_REG_H = 1e-3
-DROPOUT_F = 0.3   # introduce base dropout in fine-tuning
-L2_REG_F = 1e-5
+DROPOUT_F = 0.35
+L2_REG_F = 1e-4
 
 THRESHOLD = 0.5
-CLASS_WEIGHTS_MULT_FINE = 1.75
+CLASS_WEIGHTS_MULT_FINE = 2
 
 # === PATHS ===
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}/fine"
@@ -124,22 +124,26 @@ print("[DEBUG] Head weights loaded successfully.")
 # === FINE-TUNING SETUP ===
 base_model.trainable = True
 
-# === Unfreeze only selected BatchNormalization layers ===
+# === Progressive BN unfreezing ===
 bn_layers = [layer for layer in base_model.layers if isinstance(layer, tf.keras.layers.BatchNormalization)]
-num_unfreeze = max(1, int(len(bn_layers) * 0.5))  # unfreeze last 50% of BN layers
+total_bn = len(bn_layers)
 
-for layer in bn_layers[:-num_unfreeze]:
-    layer.trainable = False
-for layer in bn_layers[-num_unfreeze:]:
-    layer.trainable = True
-
-print(f"[INFO] Unfroze the last {num_unfreeze} BatchNormalization layers for adaptation.")
+# Example strategy: progressively unfreeze in thirds (can modify as needed)
+unfreeze_fractions = [0.33, 0.66, 1.0]
+for frac in unfreeze_fractions:
+    num_unfreeze = max(1, int(total_bn * frac))
+    print(f"[INFO] Unfreezing last {num_unfreeze}/{total_bn} BatchNormalization layers for adaptation.")
+    
+    for layer in bn_layers[:-num_unfreeze]:
+        layer.trainable = False
+    for layer in bn_layers[-num_unfreeze:]:
+        layer.trainable = True
 
 # === COMPILE MODEL ===
 lr_schedule = ExponentialDecay(
     initial_learning_rate=FINE_TUNE_LR,
-    decay_steps=200,
-    decay_rate=0.99,
+    decay_steps=100,
+    decay_rate=0.98,
     staircase=True
 )
 
@@ -158,7 +162,7 @@ model.compile(
 
 # === CALLBACKS ===
 callbacks = [
-    EarlyStopping(monitor="val_auc", mode="max", patience=15, restore_best_weights=True),
+    EarlyStopping(monitor="val_auc", mode="max", patience=30, restore_best_weights=True),
     ModelCheckpoint(MODEL_WEIGHTS_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
     RecallLogger()
 ]
