@@ -34,11 +34,11 @@ LABEL_SMOOTHING_F = 0.01
 
 DROPOUT_H = 0.6   # keep consistent with head
 L2_REG_H = 1e-3
-DROPOUT_F = 0.4   # introduce base dropout in fine-tuning
-L2_REG_F = 1e-3
+DROPOUT_F = 0.3   # introduce base dropout in fine-tuning
+L2_REG_F = 1e-5
 
 THRESHOLD = 0.5
-CLASS_WEIGHTS_MULT_FINE = 1.5
+CLASS_WEIGHTS_MULT_FINE = 2
 
 # === PATHS ===
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}/fine"
@@ -139,7 +139,7 @@ print(f"[INFO] Unfroze the last {num_unfreeze} BatchNormalization layers for ada
 lr_schedule = ExponentialDecay(
     initial_learning_rate=FINE_TUNE_LR,
     decay_steps=200,
-    decay_rate=0.98,
+    decay_rate=0.99,
     staircase=True
 )
 
