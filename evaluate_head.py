@@ -5,7 +5,7 @@ import time
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.metrics import classification_report, roc_auc_score, roc_curve
+from sklearn.metrics import classification_report, roc_auc_score, confusion_matrix
 
 from model import build_model
 from data_loader import get_generators
@@ -78,7 +78,7 @@ for name, val in zip(model.metrics_names, results):
 
 # === Generate ROC Curve ===
 print("[INFO] Generating ROC curve...")
-y_prob = model.predict(test_gen).flatten()
+y_prob = model.predict(test_gen, verbose=1).flatten()
 y_true = np.array(test_gen.classes)
 
 roc_curve_path = os.path.join(output_dir, "roc_curve_head_test.png")
@@ -88,7 +88,6 @@ print(f"[INFO] ROC curve saved to {roc_curve_path}")
 print(f"[INFO] Test ROC AUC: {roc_auc:.4f}")
 
 # === Save Prediction Probability Histogram ===
-print("[INFO] Saving prediction probability histogram...")
 plt.figure(figsize=(8,6))
 plt.hist(y_prob, bins=50, color='skyblue', edgecolor='black')
 plt.title("Head Test Prediction Probabilities")
@@ -107,6 +106,18 @@ labels = list(test_gen.class_indices.keys())
 report = classification_report(y_true, y_pred, target_names=labels, digits=4)
 print("[INFO] Classification report:\n")
 print(report)
+
+# === Confusion Matrix and Derived Metrics ===
+cm = confusion_matrix(y_true, y_pred)
+tn, fp, fn, tp = cm.ravel()
+specificity = tn / (tn + fp) if (tn + fp) > 0 else 0
+sensitivity = tp / (tp + fn) if (tp + fn) > 0 else 0
+
+print(f"Confusion Matrix: \n{cm}")
+print(f"Accuracy: {results[model.metrics_names.index('accuracy')]:.4f}")
+print(f"AUC: {roc_auc:.4f}")
+print(f"Sensitivity (Recall): {sensitivity:.4f}")
+print(f"Specificity: {specificity:.4f}")
 
 # === Save Confusion Matrix ===
 conf_matrix_path = os.path.join(output_dir, "confusion_matrix_head.png")
