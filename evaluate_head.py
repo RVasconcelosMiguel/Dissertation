@@ -47,9 +47,8 @@ model, _ = build_model(
     l2_lambda_head=1e-3,
     l2_lambda_base=0.0
 )
-   # === Load weights ===
-if not os.path.exists(MODEL_WEIGHTS_PATH + ".index"):
-    raise FileNotFoundError(f"[ERROR] Missing head weights file: {MODEL_WEIGHTS_PATH}.index")
+
+# === Load weights ===
 print(f"[INFO] Loading head-only weights from: {MODEL_WEIGHTS_PATH}")
 model.load_weights(MODEL_WEIGHTS_PATH).expect_partial()
 
