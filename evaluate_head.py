@@ -1,4 +1,5 @@
 # === evaluate_head.py ===
+
 import os
 import time
 import tensorflow as tf
@@ -14,13 +15,15 @@ from plot_utils import save_confusion_matrix, save_roc_curve
 model_name = "efficientnetb4"
 IMG_SIZE = 380
 BATCH_SIZE = 16
-THRESHOLD = 0.5  # Default for head evaluation
+THRESHOLD = 0.5
 
 # === Paths ===
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}/head"
-os.makedirs(output_dir, exist_ok=True)
+MODEL_DIR = "models/head"
+FULL_MODEL_PATH = os.path.join(MODEL_DIR, f"{model_name}_head_model")
+MODEL_WEIGHTS_PATH = os.path.join(MODEL_DIR, f"{model_name}_head_weights")
 
-WEIGHTS_PATH = f"models/{model_name}_head_weights"  # Adjust if your head weights are saved under a specific name
+os.makedirs(output_dir, exist_ok=True)
 
 # === Silence TensorFlow logging ===
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -32,20 +35,26 @@ print(f"[INFO] Head evaluation started at: {time.ctime(start_time)}")
 # === Data Loading ===
 _, _, _, _, val_gen, test_gen = get_generators(IMG_SIZE, BATCH_SIZE)
 
-# === Build Model ===
-print(f"[INFO] Building model architecture: {model_name}...")
-model, _ = build_model(
-    model_name=model_name,
-    img_size=IMG_SIZE,
-    dropout=0.3,
-    l2_lambda=1e-3
-)
-
-# === Load Trained Weights ===
-print(f"[INFO] Loading head-only weights from: {WEIGHTS_PATH}")
-if not os.path.exists(WEIGHTS_PATH + ".index"):
-    raise FileNotFoundError(f"Missing head weights: {WEIGHTS_PATH}.index")
-model.load_weights(WEIGHTS_PATH).expect_partial()
+# === Load Full Saved Model if available ===
+if os.path.exists(FULL_MODEL_PATH):
+    print(f"[INFO] Loading full saved model from: {FULL_MODEL_PATH}")
+    model = tf.keras.models.load_model(FULL_MODEL_PATH, compile=False)
+else:
+    # === Otherwise build architecture and load weights ===
+    print(f"[INFO] Full model not found. Building architecture for: {model_name}")
+    model, _ = build_model(
+        model_name=model_name,
+        img_size=IMG_SIZE,
+        dropout_head=0.6,      # use same as training for compatibility
+        dropout_base=0.0,      # head training uses no base dropout
+        l2_lambda_head=1e-3,
+        l2_lambda_base=1e-3
+    )
+    # === Load Trained Weights ===
+    if not os.path.exists(MODEL_WEIGHTS_PATH + ".index"):
+        raise FileNotFoundError(f"[ERROR] Missing head weights file: {MODEL_WEIGHTS_PATH}.index")
+    print(f"[INFO] Loading head-only weights from: {MODEL_WEIGHTS_PATH}")
+    model.load_weights(MODEL_WEIGHTS_PATH).expect_partial()
 
 # === Compile Model for Evaluation ===
 thresholded_metrics = [
@@ -78,7 +87,7 @@ roc_auc = roc_auc_score(y_true, y_prob)
 print(f"[INFO] ROC curve saved to {roc_curve_path}")
 print(f"[INFO] Test ROC AUC: {roc_auc:.4f}")
 
-# === Save prediction probability histogram ===
+# === Save Prediction Probability Histogram ===
 print("[INFO] Saving prediction probability histogram...")
 plt.figure(figsize=(8,6))
 plt.hist(y_prob, bins=50, color='skyblue', edgecolor='black')
@@ -96,7 +105,7 @@ y_pred = (y_prob >= THRESHOLD).astype(int)
 labels = list(test_gen.class_indices.keys())
 
 report = classification_report(y_true, y_pred, target_names=labels, digits=4)
-print("[INFO] Classification report:")
+print("[INFO] Classification report:\n")
 print(report)
 
 # === Save Confusion Matrix ===
@@ -113,6 +122,7 @@ with open(eval_report_path, "w") as f:
     f.write(report)
 print(f"[INFO] Evaluation report saved to {eval_report_path}")
 
+# === End Time ===
 end_time = time.time()
 duration = end_time - start_time
 print(f"[INFO] Head evaluation completed at: {time.ctime(end_time)}")

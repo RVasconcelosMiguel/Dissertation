@@ -1,3 +1,5 @@
+# === train_head.py ===
+
 import os
 import pickle
 import numpy as np
@@ -24,8 +26,11 @@ EPOCHS_HEAD = 60
 LEARNING_RATE_HEAD = 5e-5
 LABEL_SMOOTHING_H = 0.04
 
-DROPOUT = 0.6
-L2_REG = 1e-3
+DROPOUT_HEAD = 0.6
+DROPOUT_BASE = 0.0  # No dropout on base model during head training
+
+L2_REG_HEAD = 1e-3
+L2_REG_BASE = 0.0   # No L2 on base model during head training
 
 THRESHOLD = 0.5
 CLASS_WEIGHTS_MULT_HEAD = 1.5
@@ -59,7 +64,7 @@ print("GPU available:", tf.config.list_physical_devices('GPU'))
 # === HELPER FUNCTIONS ===
 def print_distribution(name, df):
     counts = df['label'].astype(int).value_counts().sort_index()
-    print(f"[{name}] Class 0 : {counts.get(0, 0)} | Class 1 : {counts.get(1, 0)}")
+    print(f"[{name}] Class 0: {counts.get(0, 0)} | Class 1: {counts.get(1, 0)}")
 
 def save_history(history, filename):
     with open(filename, "wb") as f:
@@ -90,13 +95,13 @@ class_weights_head[1] *= CLASS_WEIGHTS_MULT_HEAD
 print("Adjusted class weights (head):", class_weights_head)
 
 # === MODEL CONSTRUCTION ===
-# Pass dropout_base=0.0 for architectural alignment with fine-tuning
 model, base_model = build_model(
-    model_name,
+    model_name=model_name,
     img_size=IMG_SIZE,
-    dropout=DROPOUT,
-    dropout_base=0.0,
-    l2_lambda=L2_REG
+    dropout_head=DROPOUT_HEAD,
+    dropout_base=DROPOUT_BASE,
+    l2_lambda_head=L2_REG_HEAD,
+    l2_lambda_base=L2_REG_BASE
 )
 
 # === CALLBACKS ===

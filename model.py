@@ -5,13 +5,11 @@ from tensorflow.keras.regularizers import l2
 from tensorflow.keras.activations import swish
 import tensorflow as tf
 
-
 # === CBAM MODULE ===
 
 def cbam_block(input_feature, ratio=8):
     channel = input_feature.shape[-1]
     
-    # Channel attention
     shared_layer_one = Dense(channel // ratio, activation='relu', kernel_initializer='he_normal', use_bias=True, bias_initializer='zeros')
     shared_layer_two = Dense(channel, kernel_initializer='he_normal', use_bias=True, bias_initializer='zeros')
     
@@ -29,166 +27,126 @@ def cbam_block(input_feature, ratio=8):
     cbam_feature = Activation('sigmoid')(cbam_feature)
     cbam_feature = Multiply()([input_feature, cbam_feature])
     
-    # Spatial attention
     avg_pool = tf.reduce_mean(cbam_feature, axis=3, keepdims=True)
     max_pool = tf.reduce_max(cbam_feature, axis=3, keepdims=True)
     concat = Concatenate(axis=3)([avg_pool, max_pool])
-    cbam_feature = Conv2D(filters=1, kernel_size=7, strides=1, padding='same', activation='sigmoid', kernel_initializer='he_normal', use_bias=False)(concat)
+    cbam_feature = Conv2D(filters=1, kernel_size=7, strides=1, padding='same',
+                          activation='sigmoid', kernel_initializer='he_normal', use_bias=False)(concat)
     cbam_feature = Multiply()([cbam_feature, input_feature])
     
     return cbam_feature
 
-def build_efficientnetb0(img_size, dropout, l2_lambda):
+# === EfficientNet builder with separate dropout and L2 for base and head ===
+
+def build_efficientnet_generic(EfficientNetClass, img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base, use_cbam=False):
     input_tensor = Input(shape=(img_size, img_size, 3))
-    base_model = EfficientNetB0(include_top=False, weights="imagenet", input_tensor=input_tensor)
+    base_model = EfficientNetClass(include_top=False, weights="imagenet", input_tensor=input_tensor)
+
+    # Apply L2 regularisation to Conv2D layers in base model
+    for layer in base_model.layers:
+        if isinstance(layer, Conv2D):
+            layer.kernel_regularizer = l2(l2_lambda_base)
+
     x = base_model.output
     x = GlobalAveragePooling2D()(x)
 
-    x = Dense(256, kernel_regularizer=l2(l2_lambda))(x)
+    # Optional Dropout for base features
+    if dropout_base > 0:
+        x = Dropout(dropout_base)(x)
+
+    # CBAM integration (only in B3, B4)
+    if use_cbam:
+        x = Reshape((1,1,x.shape[-1]))(x)
+        x = cbam_block(x)
+        x = Reshape((x.shape[-1],))(x)
+
+    # === Head layers (same as pretraining) ===
+    x = Dense(256, kernel_regularizer=l2(l2_lambda_head))(x)
     x = BatchNormalization()(x)
     x = swish(x)
-    x = Dropout(dropout)(x)
+    x = Dropout(dropout_head)(x)
 
-    x = Dense(128, kernel_regularizer=l2(l2_lambda))(x)
+    x = Dense(128, kernel_regularizer=l2(l2_lambda_head))(x)
     x = BatchNormalization()(x)
     x = swish(x)
-    x = Dropout(dropout)(x)
+    x = Dropout(dropout_head)(x)
 
-    output = Dense(1, kernel_regularizer=l2(l2_lambda))(x)  # logits output
+    output = Dense(1, activation="sigmoid", kernel_regularizer=l2(l2_lambda_head))(x)
+
     model = Model(inputs=base_model.input, outputs=output)
     return model, base_model
 
-def build_efficientnetb1(img_size, dropout, l2_lambda):
-    input_tensor = Input(shape=(img_size, img_size, 3))
-    base_model = EfficientNetB1(include_top=False, weights="imagenet", input_tensor=input_tensor)
-    x = base_model.output
-    x = GlobalAveragePooling2D()(x)
+# === EfficientNet variants ===
 
-    x = Dense(256, kernel_regularizer=l2(l2_lambda))(x)
-    x = BatchNormalization()(x)
-    x = swish(x)
-    x = Dropout(dropout)(x)
+def build_efficientnetb0(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base):
+    return build_efficientnet_generic(EfficientNetB0, img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base)
 
-    x = Dense(128, kernel_regularizer=l2(l2_lambda))(x)
-    x = BatchNormalization()(x)
-    x = swish(x)
-    x = Dropout(dropout)(x)
+def build_efficientnetb1(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base):
+    return build_efficientnet_generic(EfficientNetB1, img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base)
 
-    output = Dense(1, kernel_regularizer=l2(l2_lambda))(x)  # logits output
-    model = Model(inputs=base_model.input, outputs=output)
-    return model, base_model
+def build_efficientnetb2(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base):
+    return build_efficientnet_generic(EfficientNetB2, img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base)
 
-def build_efficientnetb2(img_size, dropout, l2_lambda):
-    input_tensor = Input(shape=(img_size, img_size, 3))
-    base_model = EfficientNetB2(include_top=False, weights="imagenet", input_tensor=input_tensor)
-    x = base_model.output
-    x = GlobalAveragePooling2D()(x)
+def build_efficientnetb3(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base):
+    return build_efficientnet_generic(EfficientNetB3, img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base, use_cbam=True)
 
-    x = Dense(256, kernel_regularizer=l2(l2_lambda))(x)
-    x = BatchNormalization()(x)
-    x = swish(x)
-    x = Dropout(dropout)(x)
+def build_efficientnetb4(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base):
+    return build_efficientnet_generic(EfficientNetB4, img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base, use_cbam=True)
 
-    x = Dense(128, kernel_regularizer=l2(l2_lambda))(x)
-    x = BatchNormalization()(x)
-    x = swish(x)
-    x = Dropout(dropout)(x)
+# === Custom CNN ===
 
-    output = Dense(1, kernel_regularizer=l2(l2_lambda))(x)  # logits output
-    model = Model(inputs=base_model.input, outputs=output)
-    return model, base_model
-
-def build_efficientnetb3(img_size, dropout, l2_lambda):
-    input_tensor = Input(shape=(img_size, img_size, 3))
-    base_model = EfficientNetB3(include_top=False, weights="imagenet", input_tensor=input_tensor)
-    
-    x = base_model.output
-    x = GlobalAveragePooling2D()(x)
-    
-    # CBAM block integration
-    x = Reshape((1,1,x.shape[-1]))(x)  # Reshape for CBAM channel attention compatibility
-    x = cbam_block(x)
-    x = Reshape((x.shape[-1],))(x)  # Flatten back for dense layers
-    
-    x = BatchNormalization()(x)
-    x = Dense(256, activation=swish, kernel_regularizer=l2(l2_lambda))(x)
-    x = Dropout(dropout)(x)
-    x = Dense(128, activation=swish, kernel_regularizer=l2(l2_lambda))(x)
-    x = Dropout(dropout)(x)
-    
-    output = Dense(1, activation="sigmoid", kernel_regularizer=l2(l2_lambda))(x)
-    model = Model(inputs=base_model.input, outputs=output)
-    return model, base_model
-
-def build_efficientnetb4(img_size, dropout, l2_lambda):
-    input_tensor = Input(shape=(img_size, img_size, 3))
-    base_model = EfficientNetB4(include_top=False, weights="imagenet", input_tensor=input_tensor)
-    
-    x = base_model.output
-    x = GlobalAveragePooling2D()(x)
-    
-    # CBAM block integration
-    x = Reshape((1,1,x.shape[-1]))(x)
-    x = cbam_block(x)
-    x = Reshape((x.shape[-1],))(x)
-    
-    x = BatchNormalization()(x)
-    x = Dense(256, activation=swish, kernel_regularizer=l2(l2_lambda))(x)
-    x = Dropout(dropout)(x)
-    x = Dense(128, activation=swish, kernel_regularizer=l2(l2_lambda))(x)
-    x = Dropout(dropout)(x)
-    
-    output = Dense(1, activation="sigmoid", kernel_regularizer=l2(l2_lambda))(x)
-    model = Model(inputs=base_model.input, outputs=output)
-    return model, base_model
-
-def build_custom_cnn(img_size, dropout, l2_lambda):
+def build_custom_cnn(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base):
     input_tensor = Input(shape=(img_size, img_size, 3))
 
-    x = Conv2D(64, (3,3), activation='relu', padding='same', kernel_regularizer=l2(l2_lambda))(input_tensor)
+    x = Conv2D(64, (3,3), activation='relu', padding='same', kernel_regularizer=l2(l2_lambda_base))(input_tensor)
     x = BatchNormalization()(x)
     x = MaxPooling2D((2,2))(x)
 
-    x = Conv2D(128, (3,3), activation='relu', padding='same', kernel_regularizer=l2(l2_lambda))(x)
+    x = Conv2D(128, (3,3), activation='relu', padding='same', kernel_regularizer=l2(l2_lambda_base))(x)
     x = BatchNormalization()(x)
     x = MaxPooling2D((2,2))(x)
 
-    x = Conv2D(256, (3,3), activation='relu', padding='same', kernel_regularizer=l2(l2_lambda))(x)
+    x = Conv2D(256, (3,3), activation='relu', padding='same', kernel_regularizer=l2(l2_lambda_base))(x)
     x = BatchNormalization()(x)
     x = MaxPooling2D((2,2))(x)
 
-    x = Conv2D(512, (3,3), activation='relu', padding='same', kernel_regularizer=l2(l2_lambda))(x)
+    x = Conv2D(512, (3,3), activation='relu', padding='same', kernel_regularizer=l2(l2_lambda_base))(x)
     x = BatchNormalization()(x)
     x = MaxPooling2D((2,2))(x)
 
     x = GlobalAveragePooling2D()(x)
 
-    x = Dense(256, activation='relu', kernel_regularizer=l2(l2_lambda))(x)
-    x = Dropout(dropout)(x)
-    x = Dense(128, activation='relu', kernel_regularizer=l2(l2_lambda))(x)
-    x = Dropout(dropout)(x)
-    x = Dense(64, activation='relu', kernel_regularizer=l2(l2_lambda))(x)
-    x = Dropout(dropout)(x)
+    if dropout_base > 0:
+        x = Dropout(dropout_base)(x)
 
-    output = Dense(1, kernel_regularizer=l2(l2_lambda))(x)  # logits output
+    x = Dense(256, activation='relu', kernel_regularizer=l2(l2_lambda_head))(x)
+    x = Dropout(dropout_head)(x)
+    x = Dense(128, activation='relu', kernel_regularizer=l2(l2_lambda_head))(x)
+    x = Dropout(dropout_head)(x)
+    x = Dense(64, activation='relu', kernel_regularizer=l2(l2_lambda_head))(x)
+    x = Dropout(dropout_head)(x)
+
+    output = Dense(1, activation="sigmoid", kernel_regularizer=l2(l2_lambda_head))(x)
 
     model = Model(inputs=input_tensor, outputs=output)
-    base_model = None  # No pre-trained base model
+    base_model = None
 
     return model, base_model
 
-def build_model(model_name, img_size, dropout, l2_lambda):
+# === build_model dispatcher ===
+
+def build_model(model_name, img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base):
     if model_name == "efficientnetb0":
-        return build_efficientnetb0(img_size, dropout, l2_lambda)
+        return build_efficientnetb0(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base)
     elif model_name == "efficientnetb1":
-        return build_efficientnetb1(img_size, dropout, l2_lambda)
+        return build_efficientnetb1(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base)
     elif model_name == "efficientnetb2":
-        return build_efficientnetb2(img_size, dropout, l2_lambda)
+        return build_efficientnetb2(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base)
     elif model_name == "efficientnetb3":
-        return build_efficientnetb3(img_size, dropout, l2_lambda)
+        return build_efficientnetb3(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base)
     elif model_name == "efficientnetb4":
-        return build_efficientnetb4(img_size, dropout, l2_lambda)
+        return build_efficientnetb4(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base)
     elif model_name == "custom_cnn":
-        return build_custom_cnn(img_size, dropout, l2_lambda)
+        return build_custom_cnn(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base)
     else:
         raise ValueError(f"Unsupported model name: {model_name}")
