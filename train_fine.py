@@ -28,7 +28,8 @@ random.seed(SEED)
 model_name = "efficientnetb4"
 IMG_SIZE = 380
 BATCH_SIZE = 16
-FINE_TUNE_EPOCHS = 60
+FINE_TUNE_TOTAL_EPOCHS = 60
+EPOCHS_PER_STAGE = 20  # Divide total epochs into unfreeze stages
 FINE_TUNE_LR = 3e-5
 LABEL_SMOOTHING_F = 0.01
 
@@ -122,65 +123,63 @@ model.load_weights(HEAD_WEIGHTS_PATH)
 print("[DEBUG] Head weights loaded successfully.")
 
 # === FINE-TUNING SETUP ===
-base_model.trainable = True
-
-# === Progressive BN unfreezing ===
 bn_layers = [layer for layer in base_model.layers if isinstance(layer, tf.keras.layers.BatchNormalization)]
 total_bn = len(bn_layers)
+unfreeze_stages = [0.33, 0.66, 1.0]
+history_fine_all = {}
 
-# Example strategy: progressively unfreeze in thirds (can modify as needed)
-unfreeze_fractions = [0.33, 0.66, 1.0]
-for frac in unfreeze_fractions:
+# === STAGED TRAINING ===
+for i, frac in enumerate(unfreeze_stages):
+    print(f"[STAGE {i+1}] Unfreezing {int(frac*100)}% of BN layers")
+
     num_unfreeze = max(1, int(total_bn * frac))
-    print(f"[INFO] Unfreezing last {num_unfreeze}/{total_bn} BatchNormalization layers for adaptation.")
-    
     for layer in bn_layers[:-num_unfreeze]:
         layer.trainable = False
     for layer in bn_layers[-num_unfreeze:]:
         layer.trainable = True
 
-# === COMPILE MODEL ===
-lr_schedule = ExponentialDecay(
-    initial_learning_rate=FINE_TUNE_LR,
-    decay_steps=100,
-    decay_rate=0.98,
-    staircase=True
-)
+    # Recompile model for updated trainable layers
+    lr_schedule = ExponentialDecay(
+        initial_learning_rate=FINE_TUNE_LR,
+        decay_steps=100,
+        decay_rate=0.98,
+        staircase=True
+    )
+    optimizer = Adam(learning_rate=lr_schedule)
+    model.compile(
+        optimizer=optimizer,
+        loss=tf.keras.losses.BinaryCrossentropy(from_logits=False, label_smoothing=LABEL_SMOOTHING_F),
+        metrics=[
+            tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
+            tf.keras.metrics.AUC(name="auc"),
+            tf.keras.metrics.Precision(name="precision", thresholds=THRESHOLD),
+            tf.keras.metrics.Recall(name="recall", thresholds=THRESHOLD),
+        ]
+    )
 
-optimizer = Adam(learning_rate=lr_schedule)
-
-model.compile(
-    optimizer=optimizer,
-    loss=tf.keras.losses.BinaryCrossentropy(from_logits=False, label_smoothing=LABEL_SMOOTHING_F),
-    metrics=[
-        tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
-        tf.keras.metrics.AUC(name="auc"),
-        tf.keras.metrics.Precision(name="precision", thresholds=THRESHOLD),
-        tf.keras.metrics.Recall(name="recall", thresholds=THRESHOLD),
+    # === CALLBACKS ===
+    callbacks = [
+        EarlyStopping(monitor="val_auc", mode="max", patience=10, restore_best_weights=True),
+        ModelCheckpoint(MODEL_WEIGHTS_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
+        RecallLogger()
     ]
-)
 
-# === CALLBACKS ===
-callbacks = [
-    EarlyStopping(monitor="val_auc", mode="max", patience=30, restore_best_weights=True),
-    ModelCheckpoint(MODEL_WEIGHTS_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
-    RecallLogger()
-]
+    # === TRAINING STAGE ===
+    print(f"[INFO] Training for {EPOCHS_PER_STAGE} epochs at stage {i+1}...")
+    history_stage = model.fit(
+        train_gen, validation_data=val_gen,
+        epochs=EPOCHS_PER_STAGE, callbacks=callbacks,
+        class_weight=class_weights_fine, verbose=1
+    )
 
-# === TRAINING ===
-print("[INFO] Starting full fine-tuning...")
-history_fine = model.fit(
-    train_gen, validation_data=val_gen,
-    epochs=FINE_TUNE_EPOCHS, callbacks=callbacks,
-    class_weight=class_weights_fine, verbose=1
-)
+    history_fine_all[f'stage_{i+1}'] = history_stage.history
 
 # === SAVE HISTORY ===
-save_history(history_fine.history, os.path.join(MODEL_DIR, f"history_{model_name}_fine.pkl"))
+save_history(history_fine_all, os.path.join(MODEL_DIR, f"history_{model_name}_fine.pkl"))
 
 # === PLOT METRICS ===
 plot_history_finetune_stages(
-    {'fine_tune': history_fine.history},
+    history_fine_all,
     save_path=output_dir,
     metrics=["accuracy", "loss", "auc", "precision", "recall"]
 )
@@ -204,7 +203,7 @@ fpr, tpr, thresholds = roc_curve(val_labels, scaled_probs)
 youden_index = tpr - fpr
 optimal_idx = np.argmax(youden_index)
 optimal_threshold = thresholds[optimal_idx] if np.isfinite(thresholds[optimal_idx]) else 0.5
-print(f"[INFO] Optimal validation threshold (Youden's J) after temperature scaling: {optimal_threshold:.4f}")
+print(f"[INFO] Optimal validation threshold (Youden's J): {optimal_threshold:.4f}")
 
 with open(os.path.join(output_dir, "optimal_threshold_val.txt"), "w") as f:
     f.write(f"{optimal_threshold:.4f}\n")
