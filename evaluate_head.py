@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import classification_report, roc_auc_score, confusion_matrix
 
-from model import build_model
+from model import build_model, swish, cbam_block
 from data_loader import get_generators
 from plot_utils import save_confusion_matrix, save_roc_curve
 
@@ -35,22 +35,33 @@ print(f"[INFO] Head evaluation started at: {time.ctime(start_time)}")
 # === Data Loading ===
 _, _, _, _, val_gen, test_gen = get_generators(IMG_SIZE, BATCH_SIZE)
 
-# === Load Full Saved Model if available ===
+# === Load Model ===
+custom_objects = {"swish": swish, "cbam_block": cbam_block}
+
+model = None
+
 if os.path.exists(FULL_MODEL_PATH):
-    print(f"[INFO] Loading full saved model from: {FULL_MODEL_PATH}")
-    model = tf.keras.models.load_model(FULL_MODEL_PATH, compile=False)
-else:
-    # === Otherwise build architecture and load weights ===
-    print(f"[INFO] Full model not found. Building architecture for: {model_name}")
+    print(f"[INFO] Attempting to load full saved model from: {FULL_MODEL_PATH}")
+    try:
+        model = tf.keras.models.load_model(FULL_MODEL_PATH, compile=False, custom_objects=custom_objects)
+        print("[INFO] Full Keras model loaded successfully.")
+    except Exception as e:
+        print(f"[WARNING] Failed to load full model due to: {e}")
+        print("[INFO] Falling back to building architecture and loading weights instead.")
+
+if model is None:
+    # === Build architecture and load weights ===
+    print(f"[INFO] Building model architecture for: {model_name}")
     model, _ = build_model(
         model_name=model_name,
         img_size=IMG_SIZE,
-        dropout_head=0.6,      # use same as training for compatibility
-        dropout_base=0.0,      # head training uses no base dropout
+        dropout_head=0.6,   # match training
+        dropout_base=0.0,
         l2_lambda_head=1e-3,
-        l2_lambda_base=1e-3
+        l2_lambda_base=0.0
     )
-    # === Load Trained Weights ===
+
+    # === Load weights ===
     if not os.path.exists(MODEL_WEIGHTS_PATH + ".index"):
         raise FileNotFoundError(f"[ERROR] Missing head weights file: {MODEL_WEIGHTS_PATH}.index")
     print(f"[INFO] Loading head-only weights from: {MODEL_WEIGHTS_PATH}")

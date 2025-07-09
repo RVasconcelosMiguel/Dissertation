@@ -18,7 +18,7 @@ conda activate rm_dermo_env
 # Run the HEAD training and evaluation scripts
 
 echo "=== TRAINING HEAD ==="
-python train_head.py | tee ../files_to_transfer/efficientnetb4/head/train_head_log.txt
+#python train_head.py | tee ../files_to_transfer/efficientnetb4/head/train_head_log.txt
 
 echo "=== EVALUATION HEAD ==="
 python evaluate_head.py | tee ../files_to_transfer/efficientnetb4/head/evaluate_head_log.txt
