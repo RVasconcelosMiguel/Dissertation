@@ -12,6 +12,7 @@ from sklearn.utils.class_weight import compute_class_weight
 
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, Callback
+from tensorflow.keras.optimizers.schedules import ExponentialDecay
 
 from model import build_model
 from data_loader import get_generators
@@ -31,9 +32,9 @@ FINE_TUNE_EPOCHS = 60
 FINE_TUNE_LR = 3e-5
 LABEL_SMOOTHING_F = 0.01
 
-DROPOUT_H = 0.6
+DROPOUT_H = 0.6   # keep consistent with head
 L2_REG_H = 1e-3
-DROPOUT_F= 0.4
+DROPOUT_F = 0.4   # introduce base dropout in fine-tuning
 L2_REG_F = 1e-3
 
 THRESHOLD = 0.5
@@ -41,9 +42,12 @@ CLASS_WEIGHTS_MULT_FINE = 1.5
 
 # === PATHS ===
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}/fine"
+MODEL_DIR = "models/fine"
 os.makedirs(output_dir, exist_ok=True)
-MODEL_PATH = f"models/{model_name}_fine_weights"
-HEAD_WEIGHTS_PATH = f"models/{model_name}_head_weights"
+os.makedirs(MODEL_DIR, exist_ok=True)
+
+MODEL_WEIGHTS_PATH = os.path.join(MODEL_DIR, f"{model_name}_fine_weights")
+HEAD_WEIGHTS_PATH = os.path.join("models/head", f"{model_name}_head_weights")
 
 # === ENVIRONMENT SETUP ===
 start_time = time.time()
@@ -103,14 +107,13 @@ class_weights_fine[1] *= CLASS_WEIGHTS_MULT_FINE
 print("Adjusted class weights (fine-tuning):", class_weights_fine)
 
 # === MODEL CONSTRUCTION ===
-
 model, base_model = build_model(
     model_name=model_name,
     img_size=IMG_SIZE,
-    dropout_head=DROPOUT_H,       # dropout for your classifier head
-    dropout_base=DROPOUT_F,       # dropout for base feature extractor, e.g. EfficientNet backbone
-    l2_lambda_head=L2_REG_H,    # L2 for head
-    l2_lambda_base=L2_REG_F     # L2 for base model (usually lower)
+    dropout_head=DROPOUT_H,
+    dropout_base=DROPOUT_F,
+    l2_lambda_head=L2_REG_H,
+    l2_lambda_base=L2_REG_F
 )
 
 # === LOAD HEAD WEIGHTS ===
@@ -122,10 +125,8 @@ print("[DEBUG] Head weights loaded successfully.")
 base_model.trainable = True
 
 # === Unfreeze only selected BatchNormalization layers ===
-# Keep most BN layers frozen, unfreeze last few for domain adaptation
-
 bn_layers = [layer for layer in base_model.layers if isinstance(layer, tf.keras.layers.BatchNormalization)]
-num_unfreeze = max(1, int(len(bn_layers) * 0.5))  # unfreeze last 20% of BN layers
+num_unfreeze = max(1, int(len(bn_layers) * 0.5))  # unfreeze last 50% of BN layers
 
 for layer in bn_layers[:-num_unfreeze]:
     layer.trainable = False
@@ -134,7 +135,8 @@ for layer in bn_layers[-num_unfreeze:]:
 
 print(f"[INFO] Unfroze the last {num_unfreeze} BatchNormalization layers for adaptation.")
 
-lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+# === COMPILE MODEL ===
+lr_schedule = ExponentialDecay(
     initial_learning_rate=FINE_TUNE_LR,
     decay_steps=200,
     decay_rate=0.98,
@@ -157,7 +159,7 @@ model.compile(
 # === CALLBACKS ===
 callbacks = [
     EarlyStopping(monitor="val_auc", mode="max", patience=15, restore_best_weights=True),
-    ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
+    ModelCheckpoint(MODEL_WEIGHTS_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
     RecallLogger()
 ]
 
@@ -170,7 +172,7 @@ history_fine = model.fit(
 )
 
 # === SAVE HISTORY ===
-save_history(history_fine.history, f"models/history_{model_name}_fine.pkl")
+save_history(history_fine.history, os.path.join(MODEL_DIR, f"history_{model_name}_fine.pkl"))
 
 # === PLOT METRICS ===
 plot_history_finetune_stages(
@@ -198,7 +200,7 @@ fpr, tpr, thresholds = roc_curve(val_labels, scaled_probs)
 youden_index = tpr - fpr
 optimal_idx = np.argmax(youden_index)
 optimal_threshold = thresholds[optimal_idx] if np.isfinite(thresholds[optimal_idx]) else 0.5
-print(f"[INFO] Optimal validation threshold (Youden's J) after temperature scaling : {optimal_threshold:.4f}")
+print(f"[INFO] Optimal validation threshold (Youden's J) after temperature scaling: {optimal_threshold:.4f}")
 
 with open(os.path.join(output_dir, "optimal_threshold_val.txt"), "w") as f:
     f.write(f"{optimal_threshold:.4f}\n")

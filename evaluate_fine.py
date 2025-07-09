@@ -18,10 +18,12 @@ BATCH_SIZE = 16
 
 # === Paths ===
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}/fine"
-os.makedirs(output_dir, exist_ok=True)
-
-WEIGHTS_PATH = f"models/{model_name}_fine_weights"
+MODEL_DIR = "models/fine"
+MODEL_WEIGHTS_PATH = os.path.join(MODEL_DIR, f"{model_name}_fine_weights")
 threshold_path = os.path.join(output_dir, "optimal_threshold_val.txt")
+
+# === Ensure output directory exists ===
+os.makedirs(output_dir, exist_ok=True)
 
 # === Silence TensorFlow logging ===
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
@@ -45,26 +47,29 @@ try:
         optimal_threshold = float(f.read().strip())
     print(f"[INFO] Loaded optimal threshold: {optimal_threshold:.4f}")
 except FileNotFoundError:
-    raise FileNotFoundError(f"Optimal threshold file not found at {threshold_path}")
+    raise FileNotFoundError(f"[ERROR] Optimal threshold file not found at {threshold_path}")
 
 # === Data Loading ===
 _, _, _, _, val_gen, test_gen = get_generators(IMG_SIZE, BATCH_SIZE)
 
 # === Build Model ===
-print(f"[INFO] Building model architecture: {model_name}...")
+print(f"[INFO] Building model architecture: {model_name} for evaluation...")
 model, _ = build_model(
     model_name=model_name,
     img_size=IMG_SIZE,
-    dropout=0.0,   # Disable dropout during evaluation
-    l2_lambda=1e-3
+    dropout_head=0.0,   # Disable dropout during evaluation
+    dropout_base=0.0,
+    l2_lambda_head=1e-3,
+    l2_lambda_base=1e-3
 )
 
 # === Load Fine-tuned Weights ===
-print(f"[INFO] Loading fine-tuned weights from: {WEIGHTS_PATH}")
-if not os.path.exists(WEIGHTS_PATH + ".index"):
-    raise FileNotFoundError(f"Missing weights: {WEIGHTS_PATH}.index")
-status = model.load_weights(WEIGHTS_PATH)
+print(f"[INFO] Loading fine-tuned weights from: {MODEL_WEIGHTS_PATH}")
+if not os.path.exists(MODEL_WEIGHTS_PATH + ".index"):
+    raise FileNotFoundError(f"[ERROR] Missing weights: {MODEL_WEIGHTS_PATH}.index")
+status = model.load_weights(MODEL_WEIGHTS_PATH)
 status.expect_partial()
+print("[DEBUG] Fine-tuned weights loaded successfully.")
 
 # === Predict on Test Set ===
 print("[INFO] Predicting on test set...")
@@ -99,17 +104,23 @@ report = classification_report(y_true, y_pred, target_names=labels, digits=4, ou
 
 for cls in labels:
     metrics = report[cls]
-    print(f"Class '{cls}': Precision={metrics['precision']:.4f}, Recall={metrics['recall']:.4f}, F1-score={metrics['f1-score']:.4f}, Support={metrics['support']}")
+    print(f"Class '{cls}': Precision={metrics['precision']:.4f}, Recall={metrics['recall']:.4f}, "
+          f"F1-score={metrics['f1-score']:.4f}, Support={metrics['support']}")
 
 print(f"Overall Accuracy: {report['accuracy']:.4f}")
-print(f"Macro Average: Precision={report['macro avg']['precision']:.4f}, Recall={report['macro avg']['recall']:.4f}, F1-score={report['macro avg']['f1-score']:.4f}")
-print(f"Weighted Average: Precision={report['weighted avg']['precision']:.4f}, Recall={report['weighted avg']['recall']:.4f}, F1-score={report['weighted avg']['f1-score']:.4f}")
+print(f"Macro Average: Precision={report['macro avg']['precision']:.4f}, "
+      f"Recall={report['macro avg']['recall']:.4f}, "
+      f"F1-score={report['macro avg']['f1-score']:.4f}")
+print(f"Weighted Average: Precision={report['weighted avg']['precision']:.4f}, "
+      f"Recall={report['weighted avg']['recall']:.4f}, "
+      f"F1-score={report['weighted avg']['f1-score']:.4f}")
 
 # === Confusion Matrix and Derived Metrics ===
 cm = confusion_matrix(y_true, y_pred)
 tn, fp, fn, tp = cm.ravel()
 specificity = tn / (tn + fp) if (tn + fp) > 0 else 0
 sensitivity = tp / (tp + fn) if (tp + fn) > 0 else 0
+
 print(f"Confusion Matrix: \n{cm}")
 print(f"Accuracy: {report['accuracy']:.4f}")
 print(f"AUC: {roc_auc:.4f}")
