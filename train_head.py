@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from sklearn.utils.class_weight import compute_class_weight
 
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau, Callback
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, Callback
 from tensorflow.keras.optimizers.schedules import ExponentialDecay
 
 from model import build_model
@@ -30,19 +30,23 @@ L2_REG = 1e-3
 THRESHOLD = 0.5
 CLASS_WEIGHTS_MULT_HEAD = 1.5
 
-DECAY = 1e-6
-
+# Learning rate scheduler
 lr_schedule = ExponentialDecay(
-    initial_learning_rate=LEARNING_RATE_HEAD,  # e.g. 5e-5
-    decay_steps=1000,                          # adjust as explained
-    decay_rate=0.9,                            # adjust as needed
-    staircase=True)
+    initial_learning_rate=LEARNING_RATE_HEAD,
+    decay_steps=1000,
+    decay_rate=0.9,
+    staircase=True
+)
 
 # === PATHS ===
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}/head"
+MODEL_DIR = "models/head"
+MODEL_WEIGHTS_PATH = os.path.join(MODEL_DIR, f"{model_name}_head_weights")
+FULL_MODEL_PATH = os.path.join(MODEL_DIR, f"{model_name}_head_model")
+
+# Ensure directories exist
 os.makedirs(output_dir, exist_ok=True)
-MODEL_PATH = f"models/{model_name}_head_weights"
-os.makedirs("models", exist_ok=True)
+os.makedirs(MODEL_DIR, exist_ok=True)
 
 # === ENVIRONMENT SETUP ===
 start_time = time.time()
@@ -86,19 +90,24 @@ class_weights_head[1] *= CLASS_WEIGHTS_MULT_HEAD
 print("Adjusted class weights (head):", class_weights_head)
 
 # === MODEL CONSTRUCTION ===
-model, base_model = build_model(model_name, img_size=IMG_SIZE, dropout=DROPOUT, l2_lambda=L2_REG)
+# Pass dropout_base=0.0 for architectural alignment with fine-tuning
+model, base_model = build_model(
+    model_name,
+    img_size=IMG_SIZE,
+    dropout=DROPOUT,
+    dropout_base=0.0,
+    l2_lambda=L2_REG
+)
 
 # === CALLBACKS ===
 callbacks_head = [
     EarlyStopping(monitor="val_auc", mode="max", patience=12, restore_best_weights=True),
-    ModelCheckpoint(MODEL_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
-    #ReduceLROnPlateau(monitor="val_auc", mode="max", factor=0.5, patience=4, min_lr=1e-7, verbose=1),
+    ModelCheckpoint(MODEL_WEIGHTS_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
     RecallLogger()
 ]
 
 # === HEAD TRAINING ===
 base_model.trainable = False
-
 for layer in base_model.layers:
     if isinstance(layer, tf.keras.layers.BatchNormalization):
         layer.trainable = False
@@ -106,7 +115,7 @@ for layer in base_model.layers:
 print("[INFO] Base model frozen for head training.")
 
 model.compile(
-    optimizer = Adam(learning_rate=lr_schedule),
+    optimizer=Adam(learning_rate=lr_schedule),
     loss=tf.keras.losses.BinaryCrossentropy(from_logits=False, label_smoothing=LABEL_SMOOTHING_H),
     metrics=[
         tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
@@ -118,15 +127,27 @@ model.compile(
 
 print("[INFO] Starting head training...")
 history_head = model.fit(
-    train_gen, validation_data=val_gen, epochs=EPOCHS_HEAD,
-    callbacks=callbacks_head, class_weight=class_weights_head, verbose=1
+    train_gen,
+    validation_data=val_gen,
+    epochs=EPOCHS_HEAD,
+    callbacks=callbacks_head,
+    class_weight=class_weights_head,
+    verbose=1
 )
 
 # === SAVE HISTORY ===
 save_history(history_head.history, f"models/history_{model_name}_head.pkl")
 
+# === SAVE FULL MODEL ===
+print(f"[INFO] Saving full model to {FULL_MODEL_PATH}")
+model.save(FULL_MODEL_PATH, include_optimizer=True)
+
 # === PLOTTING ===
-plot_history_head(history_head.history, save_path=output_dir, metrics=["accuracy", "loss", "auc", "precision", "recall"])
+plot_history_head(
+    history_head.history,
+    save_path=output_dir,
+    metrics=["accuracy", "loss", "auc", "precision", "recall"]
+)
 
 # === TRAINING TIME ===
 elapsed_time = time.time() - start_time
