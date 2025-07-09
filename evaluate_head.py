@@ -20,7 +20,6 @@ THRESHOLD = 0.5
 # === Paths ===
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}/head"
 MODEL_DIR = "models/head"
-FULL_MODEL_PATH = os.path.join(MODEL_DIR, f"{model_name}_head_model")
 MODEL_WEIGHTS_PATH = os.path.join(MODEL_DIR, f"{model_name}_head_weights")
 
 os.makedirs(output_dir, exist_ok=True)
@@ -38,34 +37,21 @@ _, _, _, _, val_gen, test_gen = get_generators(IMG_SIZE, BATCH_SIZE)
 # === Load Model ===
 custom_objects = {"swish": swish, "cbam_block": cbam_block}
 
-model = None
-
-if os.path.exists(FULL_MODEL_PATH):
-    print(f"[INFO] Attempting to load full saved model from: {FULL_MODEL_PATH}")
-    try:
-        model = tf.keras.models.load_model(FULL_MODEL_PATH, compile=False, custom_objects=custom_objects)
-        print("[INFO] Full Keras model loaded successfully.")
-    except Exception as e:
-        print(f"[WARNING] Failed to load full model due to: {e}")
-        print("[INFO] Falling back to building architecture and loading weights instead.")
-
-if model is None:
-    # === Build architecture and load weights ===
-    print(f"[INFO] Building model architecture for: {model_name}")
-    model, _ = build_model(
-        model_name=model_name,
-        img_size=IMG_SIZE,
-        dropout_head=0.6,   # match training
-        dropout_base=0.0,
-        l2_lambda_head=1e-3,
-        l2_lambda_base=0.0
-    )
-
-    # === Load weights ===
-    if not os.path.exists(MODEL_WEIGHTS_PATH + ".index"):
-        raise FileNotFoundError(f"[ERROR] Missing head weights file: {MODEL_WEIGHTS_PATH}.index")
-    print(f"[INFO] Loading head-only weights from: {MODEL_WEIGHTS_PATH}")
-    model.load_weights(MODEL_WEIGHTS_PATH).expect_partial()
+# === Build architecture and load weights ===
+print(f"[INFO] Building model architecture for: {model_name}")
+model, _ = build_model(
+    model_name=model_name,
+    img_size=IMG_SIZE,
+    dropout_head=0.6,   # match training
+    dropout_base=0.0,
+    l2_lambda_head=1e-3,
+    l2_lambda_base=0.0
+)
+   # === Load weights ===
+if not os.path.exists(MODEL_WEIGHTS_PATH + ".index"):
+    raise FileNotFoundError(f"[ERROR] Missing head weights file: {MODEL_WEIGHTS_PATH}.index")
+print(f"[INFO] Loading head-only weights from: {MODEL_WEIGHTS_PATH}")
+model.load_weights(MODEL_WEIGHTS_PATH).expect_partial()
 
 # === Compile Model for Evaluation ===
 thresholded_metrics = [
