@@ -1,27 +1,30 @@
 import os
 import pickle
-from plot_utils import plot_history
+import time
+from plot_utils import plot_history_head
 
-# === CONFIGURATION (must match your train.py) ===
-model_name = "efficientnetb1"
+# === CONFIGURATION ===
+model_name = "efficientnetb4"
+MODEL_DIR = "models/head"
+output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}/head"
 
-# === PATHS ===
-output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}"
-history_path = f"models/history_{model_name}.pkl"
+history_path = os.path.join(MODEL_DIR, f"history_{model_name}_head.pkl")
 
-# === METRICS TO PLOT ===
-metrics = ["accuracy", "loss", "auc", "precision", "recall"]
-
-# === LOAD HISTORY ===
-if not os.path.exists(history_path):
-    raise FileNotFoundError(f"[ERROR] History file not found at {history_path}")
-
+# === Load history ===
 with open(history_path, "rb") as f:
-    history_all = pickle.load(f)
-
+    history_head = pickle.load(f)
 print(f"[INFO] Loaded history from {history_path}")
 
-# === PLOT ===
-plot_history(history_all, save_path=output_dir, metrics=metrics)
+# === Start timer ===
+start_time = time.time()
 
-print(f"[INFO] Finished plotting metrics. Saved to {output_dir}")
+# === PLOTTING ===
+plot_history_head(
+    history_head,
+    save_path=output_dir,
+    metrics=["accuracy", "loss", "auc", "precision", "recall"]
+)
+
+# === TRAINING TIME (for this plotting script) ===
+elapsed_time = time.time() - start_time
+print(f"[INFO] Plotting completed in: {int(elapsed_time // 60)}m {int(elapsed_time % 60)}s")

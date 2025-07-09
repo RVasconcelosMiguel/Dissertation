@@ -141,11 +141,7 @@ history_head = model.fit(
 )
 
 # === SAVE HISTORY ===
-save_history(history_head.history, f"models/history_{model_name}_head.pkl")
-
-# === SAVE FULL MODEL ===
-print(f"[INFO] Saving full model to {FULL_MODEL_PATH}")
-model.save(FULL_MODEL_PATH, include_optimizer=True)
+save_history(history_head.history, os.path.join(MODEL_DIR, f"history_{model_name}_head.pkl"))
 
 # === PLOTTING ===
 plot_history_head(
