@@ -28,7 +28,7 @@ random.seed(SEED)
 model_name = "efficientnetb4"
 IMG_SIZE = 380
 BATCH_SIZE = 16
-FINE_TUNE_EPOCHS = 60
+FINE_TUNE_EPOCHS = 40
 FINE_TUNE_LR = 3e-5
 LABEL_SMOOTHING_F = 0.01
 
