@@ -117,7 +117,7 @@ model, base_model = build_model(
 )
 
 # === LOAD HEAD WEIGHTS ===
-print(f"[INFO] Loading head-trained weights from: {HEAD_WEIGHTS_PATH}")
+print(f"[INFO] Loading head-trained weights from : {HEAD_WEIGHTS_PATH}")
 model.load_weights(HEAD_WEIGHTS_PATH)
 print("[DEBUG] Head weights loaded successfully.")
 
