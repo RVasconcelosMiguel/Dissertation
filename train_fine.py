@@ -126,7 +126,7 @@ base_model.trainable = True
 
 # === Unfreeze only selected BatchNormalization layers ===
 bn_layers = [layer for layer in base_model.layers if isinstance(layer, tf.keras.layers.BatchNormalization)]
-num_unfreeze = max(1, int(len(bn_layers) * 0.2))  # unfreeze last 50% of BN layers
+num_unfreeze = max(1, int(len(bn_layers) * 0.5))  # unfreeze last 50% of BN layers
 
 for layer in bn_layers[:-num_unfreeze]:
     layer.trainable = False
@@ -138,8 +138,8 @@ print(f"[INFO] Unfroze the last {num_unfreeze} BatchNormalization layers for ada
 # === COMPILE MODEL ===
 lr_schedule = ExponentialDecay(
     initial_learning_rate=FINE_TUNE_LR,
-    decay_steps=200,
-    decay_rate=0.93,
+    decay_steps=100,
+    decay_rate=0.9,
     staircase=True
 )
 
