@@ -29,12 +29,12 @@ model_name = "efficientnetb4"
 IMG_SIZE = 380
 BATCH_SIZE = 16
 FINE_TUNE_EPOCHS = 60
-FINE_TUNE_LR = 2e-5
-LABEL_SMOOTHING_F = 0.005
+FINE_TUNE_LR = 5e-5
+LABEL_SMOOTHING_F = 0.001
 
 DROPOUT_H = 0.6   # keep consistent with head
 L2_REG_H = 1e-3
-DROPOUT_F = 0.3   # introduce base dropout in fine-tuning
+DROPOUT_F = 0.2   # introduce base dropout in fine-tuning
 L2_REG_F = 1e-4
 
 THRESHOLD = 0.5
@@ -126,7 +126,7 @@ base_model.trainable = True
 
 # === Unfreeze only selected BatchNormalization layers ===
 bn_layers = [layer for layer in base_model.layers if isinstance(layer, tf.keras.layers.BatchNormalization)]
-num_unfreeze = max(1, int(len(bn_layers) * 0.4))  # unfreeze last 50% of BN layers
+num_unfreeze = max(1, int(len(bn_layers) * 0.2))  # unfreeze last 50% of BN layers
 
 for layer in bn_layers[:-num_unfreeze]:
     layer.trainable = False
@@ -139,7 +139,7 @@ print(f"[INFO] Unfroze the last {num_unfreeze} BatchNormalization layers for ada
 lr_schedule = ExponentialDecay(
     initial_learning_rate=FINE_TUNE_LR,
     decay_steps=200,
-    decay_rate=0.99,
+    decay_rate=0.93,
     staircase=True
 )
 
