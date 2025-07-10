@@ -139,7 +139,7 @@ print(f"[INFO] Unfroze the last {num_unfreeze} BatchNormalization layers for ada
 lr_schedule = ExponentialDecay(
     initial_learning_rate=FINE_TUNE_LR,
     decay_steps=100,
-    decay_rate=0.96,
+    decay_rate=0.94,
     staircase=True
 )
 
