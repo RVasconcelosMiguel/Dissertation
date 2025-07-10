@@ -126,7 +126,7 @@ base_model.trainable = True
 
 # === Unfreeze only selected BatchNormalization layers ===
 bn_layers = [layer for layer in base_model.layers if isinstance(layer, tf.keras.layers.BatchNormalization)]
-num_unfreeze = max(1, int(len(bn_layers) * 0.8))  # unfreeze last 50% of BN layers
+num_unfreeze = max(1, int(len(bn_layers) * 0.4))  # unfreeze last 50% of BN layers
 
 for layer in bn_layers[:-num_unfreeze]:
     layer.trainable = False
