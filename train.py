@@ -99,7 +99,7 @@ print_distribution("Test", test_df)
 # === CLASS WEIGHTS HEAD ===
 class_weights_head = compute_class_weights(train_df)
 class_weights_head[1] *= CLASS_WEIGHTS_MULT_HEAD
-print("Adjusted class weights (head):", class_weights_head)
+print("Adjusted class weights (head) :", class_weights_head)
 
 # === MODEL CONSTRUCTION ===
 model, base_model = build_model(model_name, img_size=IMG_SIZE, dropout=DROPOUT, l2_lambda=L2_REG)
