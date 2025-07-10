@@ -126,7 +126,7 @@ base_model.trainable = True
 
 # === Unfreeze only selected BatchNormalization layers ===
 bn_layers = [layer for layer in base_model.layers if isinstance(layer, tf.keras.layers.BatchNormalization)]
-num_unfreeze = max(1, int(len(bn_layers) * 0.5))  # unfreeze last 50% of BN layers
+num_unfreeze = max(1, int(len(bn_layers) * 0.75))  # unfreeze last 50% of BN layers
 
 for layer in bn_layers[:-num_unfreeze]:
     layer.trainable = False
@@ -158,7 +158,7 @@ model.compile(
 
 # === CALLBACKS ===
 callbacks = [
-    EarlyStopping(monitor="val_auc", mode="max", patience=15, restore_best_weights=True),
+    EarlyStopping(monitor="val_auc", mode="max", patience=25, restore_best_weights=True),
     ModelCheckpoint(MODEL_WEIGHTS_PATH, monitor="val_auc", mode="max", save_best_only=True, save_weights_only=True),
     RecallLogger()
 ]
