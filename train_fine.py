@@ -28,7 +28,7 @@ random.seed(SEED)
 model_name = "efficientnetb4"
 IMG_SIZE = 380
 BATCH_SIZE = 16
-FINE_TUNE_EPOCHS = 40
+FINE_TUNE_EPOCHS = 60
 FINE_TUNE_LR = 3e-5
 LABEL_SMOOTHING_F = 0.01
 
@@ -139,7 +139,7 @@ print(f"[INFO] Unfroze the last {num_unfreeze} BatchNormalization layers for ada
 lr_schedule = ExponentialDecay(
     initial_learning_rate=FINE_TUNE_LR,
     decay_steps=100,
-    decay_rate=0.94,
+    decay_rate=0.96,
     staircase=True
 )
 
