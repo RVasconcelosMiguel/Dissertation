@@ -25,26 +25,19 @@ mask_folders = {
 def apply_clahe_rgb(image):
     lab = cv2.cvtColor(image, cv2.COLOR_RGB2LAB)
     l, a, b = cv2.split(lab)
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(16, 16))
     l_clahe = clahe.apply(l)
     lab_clahe = cv2.merge((l_clahe, a, b))
     return cv2.cvtColor(lab_clahe, cv2.COLOR_LAB2RGB)
 
 def remove_hairs(image_rgb):
     gray = cv2.cvtColor(image_rgb, cv2.COLOR_RGB2GRAY)
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (17, 17))
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 15))
     blackhat = cv2.morphologyEx(gray, cv2.MORPH_BLACKHAT, kernel)
     _, mask = cv2.threshold(blackhat, 10, 255, cv2.THRESH_BINARY)
     return cv2.inpaint(image_rgb, mask, 1, cv2.INPAINT_TELEA)
 
-def normalize_illumination(image_rgb):
-    image_lab = cv2.cvtColor(image_rgb, cv2.COLOR_RGB2LAB)
-    l, a, b = cv2.split(image_lab)
-    l = cv2.equalizeHist(l)
-    normalized = cv2.merge((l, a, b))
-    return cv2.cvtColor(normalized, cv2.COLOR_LAB2RGB)
-
-def sharpen_channel_pil(channel, blur_radius=2, scale=0.5):
+def sharpen_channel_pil(channel, blur_radius=1.5, scale=0.3):
     smoothed = channel.filter(ImageFilter.GaussianBlur(radius=blur_radius))
     edge_mask = ImageChops.subtract(channel, smoothed)
     scaled_edge = edge_mask.point(lambda p: p * scale)
@@ -101,8 +94,8 @@ for key in input_folders:
 
         # === Preprocessing pipeline ===
         img_rgb = remove_hairs(img_rgb)
-        # img_rgb = apply_clahe_rgb(img_rgb)             # Optional
-        # img_rgb = normalize_illumination(img_rgb)      # Optional
+        img_rgb = apply_clahe_rgb(img_rgb)    
+       
 
         # === Channel sharpening ===
         img_pil = Image.fromarray(img_rgb)
