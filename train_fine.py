@@ -145,6 +145,9 @@ lr_schedule = ExponentialDecay(
 
 optimizer = Adam(learning_rate=lr_schedule)
 
+optimizer.iterations.assign(0)
+print("Optimizer iterations reset to:", optimizer.iterations.numpy())
+
 model.compile(
     optimizer=optimizer,
     loss=tf.keras.losses.BinaryCrossentropy(from_logits=False, label_smoothing=LABEL_SMOOTHING_F),
