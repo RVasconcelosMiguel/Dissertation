@@ -29,7 +29,7 @@ model_name = "efficientnetb4"
 IMG_SIZE = 380
 BATCH_SIZE = 16
 FINE_TUNE_EPOCHS = 60
-FINE_TUNE_LR = (5e-5)/(0.96^27)
+FINE_TUNE_LR = (5e-5)/(0.96**27)
 LABEL_SMOOTHING_F = 0.05
 
 DROPOUT_H = 0.6   # keep consistent with head
