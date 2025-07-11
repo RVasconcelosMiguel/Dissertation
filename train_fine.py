@@ -95,6 +95,30 @@ def optimize_temperature(val_probs, val_labels):
     )
     return opt_result.x[0], logits
 
+class LoggingExponentialDecay(tf.keras.optimizers.schedules.LearningRateSchedule):
+    def __init__(self, initial_learning_rate, decay_steps, decay_rate, staircase=True, name=None):
+        super().__init__()
+        self.initial_learning_rate = initial_learning_rate
+        self.decay_steps = decay_steps
+        self.decay_rate = decay_rate
+        self.staircase = staircase
+        self.name = name
+        self.last_exponent = -1  # To track when exponent changes (decay event)
+
+    def __call__(self, step):
+        with tf.name_scope(self.name or "LoggingExponentialDecay"):
+            exponent = step // self.decay_steps if self.staircase else step / self.decay_steps
+            lr = self.initial_learning_rate * self.decay_rate ** exponent
+
+            # Convert to numpy if eager execution to print
+            if tf.executing_eagerly():
+                exp_value = exponent.numpy() if hasattr(exponent, 'numpy') else exponent
+                if exp_value != self.last_exponent:
+                    print(f"[Decay Event] Step {step.numpy() if hasattr(step, 'numpy') else step}, decay exponent changed to {exp_value}, new LR: {lr.numpy() if hasattr(lr, 'numpy') else lr}")
+                    self.last_exponent = exp_value
+
+            return lr
+
 # === DATA LOADING ===
 train_df, val_df, test_df, train_gen, val_gen, test_gen = get_generators(IMG_SIZE, BATCH_SIZE)
 print_distribution("Train", train_df)
@@ -136,7 +160,7 @@ for layer in bn_layers[-num_unfreeze:]:
 print(f"[INFO] Unfroze the last {num_unfreeze} BatchNormalization layers for adaptation.")
 
 # === COMPILE MODEL ===
-lr_schedule = ExponentialDecay(
+lr_schedule = LoggingExponentialDecay(
     initial_learning_rate=FINE_TUNE_LR,
     decay_steps=60,
     decay_rate=0.96,
