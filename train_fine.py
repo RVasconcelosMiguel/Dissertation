@@ -71,7 +71,7 @@ class RecallLogger(Callback):
     def on_epoch_end(self, epoch, logs=None):
         recall = logs.get("val_recall")
         lr = self.model.optimizer._decayed_lr(tf.float32).numpy()
-        print(f"[Epoch {epoch+1}] val_recall: {recall:.4f} - lr: {lr:.8f}")
+        print(f"[Epoch {epoch+1}] val_recall : {recall:.4f} - lr: {lr:.8f}")
 
 def compute_class_weights(df):
     labels = df['label'].astype(int)
