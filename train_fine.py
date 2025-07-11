@@ -38,7 +38,7 @@ DROPOUT_F = 0.3   # introduce base dropout in fine-tuning
 L2_REG_F = 1e-5
 
 THRESHOLD = 0.5
-CLASS_WEIGHTS_MULT_FINE = 1.25
+CLASS_WEIGHTS_MULT_FINE = 1.5
 
 # === PATHS ===
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}/fine"
