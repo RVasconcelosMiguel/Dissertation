@@ -107,17 +107,23 @@ class LoggingExponentialDecay(tf.keras.optimizers.schedules.LearningRateSchedule
 
     def __call__(self, step):
         with tf.name_scope(self.name or "LoggingExponentialDecay"):
+            # Print the step value received at each call
+            if tf.executing_eagerly():
+                step_value = step.numpy() if hasattr(step, 'numpy') else step
+                print(f"[DEBUG] Step received by scheduler: {step_value}")
+
             exponent = step // self.decay_steps if self.staircase else step / self.decay_steps
             lr = self.initial_learning_rate * self.decay_rate ** exponent
 
-            # Convert to numpy if eager execution to print
+            # Print decay event only when exponent changes
             if tf.executing_eagerly():
                 exp_value = exponent.numpy() if hasattr(exponent, 'numpy') else exponent
                 if exp_value != self.last_exponent:
-                    print(f"[Decay Event] Step {step.numpy() if hasattr(step, 'numpy') else step}, decay exponent changed to {exp_value}, new LR: {lr.numpy() if hasattr(lr, 'numpy') else lr}")
+                    print(f"[Decay Event] Step {step_value}, decay exponent changed to {exp_value}, new LR: {lr.numpy() if hasattr(lr, 'numpy') else lr}")
                     self.last_exponent = exp_value
 
             return lr
+
 
 # === DATA LOADING ===
 train_df, val_df, test_df, train_gen, val_gen, test_gen = get_generators(IMG_SIZE, BATCH_SIZE)
