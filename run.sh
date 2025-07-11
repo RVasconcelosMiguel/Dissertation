@@ -7,8 +7,8 @@ conda activate rm_dermo_env
 
 
 #Initialization
-#echo "=== Preprocess ==="
-#python 2_preprocess.py
+echo "=== Preprocess ==="
+python 2_preprocess.py | tee ../files_to_transfer/preprocess_log.txt
 
 #echo "=== Augmentation ==="
 #python 3_augmentation.py
@@ -27,7 +27,7 @@ conda activate rm_dermo_env
 
 # Run the FINE training and evaluation scripts
 echo "=== TRAINING FINE ==="
-python train_fine.py | tee ../files_to_transfer/efficientnetb4/fine/train_fine_log.txt
+#python train_fine.py | tee ../files_to_transfer/efficientnetb4/fine/train_fine_log.txt
 
 echo "=== EVALUATION HEAD ==="
-python evaluate_fine.py | tee ../files_to_transfer/efficientnetb4/fine/evaluate_fine_log.txt
+#python evaluate_fine.py | tee ../files_to_transfer/efficientnetb4/fine/evaluate_fine_log.txt
