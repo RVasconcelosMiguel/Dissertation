@@ -10,18 +10,18 @@ conda activate rm_dermo_env
 #echo "=== Preprocess ==="
 #python 2_preprocess.py | tee ../files_to_transfer/preprocess_log.txt
 
-echo "=== Augmentation ==="
-python 3_augmentation.py
+#echo "=== Augmentation ==="
+#python 3_augmentation.py
 
 
 
 # Run the HEAD training and evaluation scripts
 
-#echo "=== TRAINING HEAD ==="
-#python train_head.py | tee ../files_to_transfer/efficientnetb4/head/train_head_log.txt
+echo "=== TRAINING HEAD ==="
+python train_head.py | tee ../files_to_transfer/efficientnetb4/head/train_head_log.txt
 
-#echo "=== EVALUATION HEAD ==="
-#python evaluate_head.py | tee ../files_to_transfer/efficientnetb4/head/evaluate_head_log.txt
+echo "=== EVALUATION HEAD ==="
+python evaluate_head.py | tee ../files_to_transfer/efficientnetb4/head/evaluate_head_log.txt
 
 
 
