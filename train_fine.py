@@ -30,7 +30,7 @@ IMG_SIZE = 380
 BATCH_SIZE = 16
 FINE_TUNE_EPOCHS = 60
 FINE_TUNE_LR = 3e-5
-LABEL_SMOOTHING_F = 0.01
+LABEL_SMOOTHING_F = 0
 
 DROPOUT_H = 0.6   # keep consistent with head
 L2_REG_H = 1e-3
@@ -38,7 +38,7 @@ DROPOUT_F = 0.3   # introduce base dropout in fine-tuning
 L2_REG_F = 1e-5
 
 THRESHOLD = 0.5
-CLASS_WEIGHTS_MULT_FINE = 2
+CLASS_WEIGHTS_MULT_FINE = 1.75
 
 # === PATHS ===
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}/fine"
