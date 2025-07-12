@@ -104,7 +104,7 @@ print_distribution("Test", test_df)
 # === CLASS WEIGHTS ===
 class_weights_fine = compute_class_weights(train_df)
 class_weights_fine[1] *= CLASS_WEIGHTS_MULT_FINE
-print("Adjusted class weights (fine-tuning):", class_weights_fine)
+print("Adjusted class weights (fine-tuning) :", class_weights_fine)
 
 # === MODEL CONSTRUCTION ===
 model, base_model = build_model(

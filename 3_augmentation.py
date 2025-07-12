@@ -75,8 +75,6 @@ augment = A.Compose([
     A.HueSaturationValue(hue_shift_limit=5, sat_shift_limit=10, val_shift_limit=10, p=0.3),
     A.ElasticTransform(alpha=0.5, sigma=20, alpha_affine=10, p=0.3),
     A.ISONoise(color_shift=(0.01, 0.01), intensity=(0.01, 0.03), p=0.1),
-    # Optional: CLAHE for enhanced contrast (comment if not wanted)
-    # A.CLAHE(clip_limit=2.0, tile_grid_size=(8,8), p=0.3),
 ])
 
 
