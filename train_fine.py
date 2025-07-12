@@ -34,7 +34,7 @@ LABEL_SMOOTHING_F = 0
 
 DROPOUT_H = 0.6   # keep consistent with head
 L2_REG_H = 1e-3
-DROPOUT_F = 0.4   # introduce base dropout in fine-tuning
+DROPOUT_F = 0.2   # introduce base dropout in fine-tuning
 L2_REG_F = 1e-5
 
 THRESHOLD = 0.5
@@ -139,7 +139,7 @@ print(f"[INFO] Unfroze the last {num_unfreeze} BatchNormalization layers for ada
 lr_schedule = ExponentialDecay(
     initial_learning_rate=FINE_TUNE_LR,
     decay_steps=60,
-    decay_rate=0.95,
+    decay_rate=0.96,
     staircase=True
 )
 
