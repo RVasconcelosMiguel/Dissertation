@@ -138,7 +138,7 @@ print(f"[INFO] Unfroze the last {num_unfreeze} BatchNormalization layers for ada
 # === COMPILE MODEL ===
 lr_schedule = ExponentialDecay(
     initial_learning_rate=FINE_TUNE_LR,
-    decay_steps=128,
+    decay_steps=64,
     decay_rate=0.96,
     staircase=True
 )
