@@ -127,6 +127,14 @@ print(f"AUC: {roc_auc:.4f}")
 print(f"Sensitivity (Recall): {sensitivity:.4f}")
 print(f"Specificity: {specificity:.4f}")
 
+# === Print false negatives with their prediction probabilities ===
+false_negatives_idx = np.where((y_true == 1) & (y_pred == 0))[0]
+
+print(f"\n[INFO] Number of False Negatives: {len(false_negatives_idx)}")
+print("[INFO] Predicted probabilities for False Negatives (should be class 1):")
+for idx in false_negatives_idx:
+    print(f"Index: {idx}, Prob: {y_prob[idx]:.4f}")
+
 # === Save Confusion Matrix ===
 conf_matrix_path = os.path.join(output_dir, "confusion_matrix_finetune.png")
 save_confusion_matrix(y_true, y_pred, labels, conf_matrix_path)
