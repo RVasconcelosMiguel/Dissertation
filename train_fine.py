@@ -39,7 +39,7 @@ DROPOUT_F = 0.2   # introduce base dropout in fine-tuning
 L2_REG_F = 1e-5
 
 THRESHOLD = 0.5
-CLASS_WEIGHTS_MULT_FINE = 4
+CLASS_WEIGHTS_MULT_FINE = 2
 
 # === PATHS ===
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}/fine"
@@ -148,7 +148,7 @@ optimizer = Adam(learning_rate=lr_schedule)
 
 model.compile(
     optimizer=optimizer,
-    loss = focal_loss(gamma=2.0, alpha=0.5),#tf.keras.losses.BinaryCrossentropy(from_logits=False, label_smoothing=LABEL_SMOOTHING_F),
+    loss = focal_loss(gamma=1.5, alpha=0.75),#tf.keras.losses.BinaryCrossentropy(from_logits=False, label_smoothing=LABEL_SMOOTHING_F),
     metrics=[
         tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
         tf.keras.metrics.AUC(name="auc"),
