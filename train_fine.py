@@ -18,10 +18,8 @@ from data_loader import get_generators
 from plot_utils import plot_history_finetune_stages
 
 # === SEED FOR REPRODUCIBILITY ===
-SEED = 42
-tf.random.set_seed(SEED)
-np.random.seed(SEED)
-random.seed(SEED)
+from seed_utils import set_global_seed
+set_global_seed(42)
 
 # === CONFIGURATION ===
 model_name = "efficientnetb4"

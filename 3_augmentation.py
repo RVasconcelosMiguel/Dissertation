@@ -1,18 +1,17 @@
 import os
 import shutil
 import pandas as pd
-import random
-import numpy as np
 from PIL import Image
 from tqdm import tqdm
-import albumentations as A
 from sklearn.model_selection import train_test_split
+import numpy as np
 
-# === Set random seed for reproducibility ===
-SEED = 42
-random.seed(SEED)
-np.random.seed(SEED)
-A.set_seed(SEED)
+from seed_utils import set_global_seed
+set_global_seed(42)
+
+import albumentations as A
+A.set_seed(42)
+import random  # still needed for e.g. shuffle operations if used
 
 
 # === Define target final number of images per class ===

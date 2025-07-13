@@ -1,15 +1,22 @@
 # === evaluate_finetune.py ===
 
 import os
+
+# === Set deterministic behavior BEFORE importing TensorFlow ===
+from seed_utils import set_global_seed
+set_global_seed(42)
+
 import time
-import tensorflow as tf
+import random
 import numpy as np
+import tensorflow as tf
 import matplotlib.pyplot as plt
 from sklearn.metrics import classification_report, roc_auc_score, confusion_matrix
 
 from model import build_model
 from data_loader import get_generators
 from plot_utils import save_confusion_matrix, save_roc_curve
+
 
 # === CONFIGURATION ===
 model_name = "efficientnetb4"

@@ -2,13 +2,15 @@ import os
 import pandas as pd
 import numpy as np
 import random
+import tensorflow as tf
+
+from seed_utils import set_global_seed
+set_global_seed(42)
+
 
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.applications.efficientnet import preprocess_input
 
-SEED = 42
-random.seed(SEED)
-np.random.seed(SEED)
 
 # === BASE PATHS ===
 BASE_PATH = "/raid/DATASETS/rmiguel_datasets/ISIC16/Classification/Split"

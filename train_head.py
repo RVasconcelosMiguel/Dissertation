@@ -1,6 +1,11 @@
 # === train_head.py ===
 
 import os
+
+# === SEED FOR REPRODUCIBILITY ===
+from seed_utils import set_global_seed
+set_global_seed(42)
+
 import pickle
 import numpy as np
 import tensorflow as tf
