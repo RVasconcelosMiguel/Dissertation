@@ -3,7 +3,6 @@ import numpy as np
 import tensorflow as tf
 from sklearn.metrics import precision_recall_curve
 from scipy.optimize import minimize
-import pickle
 
 from model import build_model
 from data_loader import get_generators
@@ -12,22 +11,25 @@ from data_loader import get_generators
 model_name = "efficientnetb4"
 IMG_SIZE = 380
 BATCH_SIZE = 16
+
 DROPOUT_H = 0.6
 DROPOUT_F = 0.2
 L2_REG_H = 1e-3
 L2_REG_F = 1e-5
 
-target_recall = 0.50
+target_recall = 0.75  # change to 0.95 or other if needed
+
+MODEL_DIR = "models/fine"
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}/fine"
-MODEL_WEIGHTS_PATH = f"models/fine/{model_name}_fine_weights"
+MODEL_WEIGHTS_PATH = os.path.join(MODEL_DIR, f"{model_name}_fine_weights")
 TEMP_FILE = os.path.join(output_dir, "optimal_temperature.txt")
 THRESHOLD_FILE = os.path.join(output_dir, "optimal_threshold_val.txt")
 
-# === ENVIRONMENT ===
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+# === ENVIRONMENT SETUP ===
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
-# === TEMPERATURE SCALING ===
+# === TEMPERATURE SCALING UTILS ===
 def nll_loss(T, logits, labels):
     scaled_logits = logits / T
     probs = tf.sigmoid(scaled_logits).numpy()
@@ -45,12 +47,10 @@ def optimize_temperature(val_probs, val_labels):
     return opt_result.x[0], logits
 
 # === LOAD DATA ===
-print("[INFO] Loading validation data...")
 _, val_df, _, _, val_gen, _ = get_generators(IMG_SIZE, BATCH_SIZE)
 val_labels = np.array(val_gen.classes)
 
-# === LOAD MODEL AND WEIGHTS ===
-print("[INFO] Rebuilding model...")
+# === BUILD MODEL ===
 model, base_model = build_model(
     model_name=model_name,
     img_size=IMG_SIZE,
@@ -60,37 +60,34 @@ model, base_model = build_model(
     l2_lambda_base=L2_REG_F
 )
 model.load_weights(MODEL_WEIGHTS_PATH)
-print("[INFO] Fine-tuned weights loaded successfully.")
+print("[INFO] Model weights loaded.")
 
-# === PREDICT ===
-print("[INFO] Predicting on validation set...")
-val_probs = model.predict(val_gen, verbose=1).squeeze()
+# === PREDICT VALIDATION ===
+val_probs = model.predict(val_gen).squeeze()
 
-# === CALIBRATE TEMPERATURE ===
+# === TEMPERATURE SCALING ===
 optimal_T, logits = optimize_temperature(val_probs, val_labels)
 with open(TEMP_FILE, "w") as f:
     f.write(f"{optimal_T:.4f}\n")
-print(f"[INFO] Optimal temperature saved: {optimal_T:.4f}")
+print(f"[INFO] Temperature scaling applied. T = {optimal_T:.4f}")
 
 scaled_logits = logits / optimal_T
 scaled_probs = tf.sigmoid(scaled_logits).numpy()
 
-# === THRESHOLDING BASED ON TARGET RECALL ===
-print(f"[INFO] Searching for threshold with recall ≥ {target_recall:.2f}...")
+# === CUSTOM THRESHOLDING BASED ON TARGET RECALL ===
 precisions, recalls, thresholds = precision_recall_curve(val_labels, scaled_probs)
 
 recall_condition = recalls >= target_recall
 if np.any(recall_condition):
     best_idx = np.argmax(recall_condition)
     optimal_threshold = thresholds[best_idx]
-    print(f"[INFO] Selected threshold: {optimal_threshold:.4f}")
-    print(f"[INFO] Precision at threshold: {precisions[best_idx]:.4f}")
-    print(f"[INFO] Recall at threshold: {recalls[best_idx]:.4f}")
+    print(f"[INFO] Selected threshold for Recall ≥ {target_recall:.2f}: {optimal_threshold:.4f}")
+    print(f"[INFO] At threshold: Recall = {recalls[best_idx]:.4f}, Precision = {precisions[best_idx]:.4f}")
 else:
     optimal_threshold = 0.5
-    print(f"[WARNING] No threshold found with Recall ≥ {target_recall}. Using default: 0.5")
+    print(f"[WARNING] No threshold found for Recall ≥ {target_recall:.2f}. Using default threshold: 0.5")
 
-# === SAVE TO FILE ===
+# === SAVE THRESHOLD TO FILE ===
 with open(THRESHOLD_FILE, "w") as f:
     f.write(f"{optimal_threshold:.4f}\n")
-print(f"[INFO] Threshold saved to {THRESHOLD_FILE}")
+print(f"[INFO] Saved threshold to: {THRESHOLD_FILE}")
