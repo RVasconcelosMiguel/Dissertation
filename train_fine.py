@@ -148,7 +148,7 @@ optimizer = Adam(learning_rate=lr_schedule)
 
 model.compile(
     optimizer=optimizer,
-    loss = focal_loss(gamma=1.5, alpha=0.75),#tf.keras.losses.BinaryCrossentropy(from_logits=False, label_smoothing=LABEL_SMOOTHING_F),
+    loss = tf.keras.losses.BinaryCrossentropy(from_logits=False, label_smoothing=LABEL_SMOOTHING_F),
     metrics=[
         tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
         tf.keras.metrics.AUC(name="auc"),
