@@ -17,7 +17,7 @@ DROPOUT_F = 0.2
 L2_REG_H = 1e-3
 L2_REG_F = 1e-5
 
-target_recall = 0.70
+target_recall = 0.50
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}/fine"
 MODEL_WEIGHTS_PATH = f"models/fine/{model_name}_fine_weights"
 TEMP_FILE = os.path.join(output_dir, "optimal_temperature.txt")
