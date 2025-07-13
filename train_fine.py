@@ -6,8 +6,7 @@ import numpy as np
 import tensorflow as tf
 import time
 import random
-from scipy.optimize import minimize
-from sklearn.metrics import roc_curve, precision_recall_curve
+from sklearn.metrics import roc_curve
 from sklearn.utils.class_weight import compute_class_weight
 
 from tensorflow.keras.optimizers import Adam
@@ -32,13 +31,14 @@ FINE_TUNE_EPOCHS = 60
 FINE_TUNE_LR = (3e-5)/(0.96**27)
 LABEL_SMOOTHING_F = 0
 
-DROPOUT_H = 0.6   # keep consistent with head
+DROPOUT_H = 0.6
 L2_REG_H = 1e-3
-DROPOUT_F = 0.2   # introduce base dropout in fine-tuning
+DROPOUT_F = 0.2
 L2_REG_F = 1e-5
 
 THRESHOLD = 0.5
 CLASS_WEIGHTS_MULT_FINE = 4
+target_recall = 0.82  # your best recall target
 
 # === PATHS ===
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}/fine"
@@ -48,6 +48,7 @@ os.makedirs(MODEL_DIR, exist_ok=True)
 
 MODEL_WEIGHTS_PATH = os.path.join(MODEL_DIR, f"{model_name}_fine_weights")
 HEAD_WEIGHTS_PATH = os.path.join("models/head", f"{model_name}_head_weights")
+THRESHOLD_FILE = os.path.join(output_dir, "optimal_threshold_val.txt")
 
 # === ENVIRONMENT SETUP ===
 start_time = time.time()
@@ -79,22 +80,6 @@ def compute_class_weights(df):
     weights = compute_class_weight('balanced', classes=classes, y=labels)
     return dict(zip(classes, weights))
 
-def nll_loss(T, logits, labels):
-    scaled_logits = logits / T
-    probs = tf.sigmoid(scaled_logits).numpy()
-    epsilon = 1e-7
-    probs = np.clip(probs, epsilon, 1 - epsilon)
-    loss = -np.mean(labels * np.log(probs) + (1 - labels) * np.log(1 - probs))
-    return loss
-
-def optimize_temperature(val_probs, val_labels):
-    logits = np.log(val_probs / (1 - val_probs))
-    opt_result = minimize(
-        nll_loss, x0=[1.0], args=(logits, val_labels),
-        bounds=[(0.05, 10)]
-    )
-    return opt_result.x[0], logits
-
 # === DATA LOADING ===
 train_df, val_df, test_df, train_gen, val_gen, test_gen = get_generators(IMG_SIZE, BATCH_SIZE)
 print_distribution("Train", train_df)
@@ -124,16 +109,15 @@ print("[DEBUG] Head weights loaded successfully.")
 # === FINE-TUNING SETUP ===
 base_model.trainable = True
 
-# === Unfreeze only selected BatchNormalization layers ===
 bn_layers = [layer for layer in base_model.layers if isinstance(layer, tf.keras.layers.BatchNormalization)]
-num_unfreeze = max(1, int(len(bn_layers) * 0.75))  # unfreeze last 75% of BN layers
+num_unfreeze = max(1, int(len(bn_layers) * 0.75))
 
 for layer in bn_layers[:-num_unfreeze]:
     layer.trainable = False
 for layer in bn_layers[-num_unfreeze:]:
     layer.trainable = True
 
-print(f"[INFO] Unfroze the last {num_unfreeze} BatchNormalization layers for adaptation.")
+print(f"[INFO] Unfroze the last {num_unfreeze} BatchNormalization layers for  adaptation.")
 
 # === COMPILE MODEL ===
 lr_schedule = ExponentialDecay(
@@ -181,37 +165,24 @@ plot_history_finetune_stages(
     metrics=["accuracy", "loss", "auc", "precision", "recall"]
 )
 
-# === TEMPERATURE SCALING ===
-print("[INFO] Starting temperature scaling calibration...")
-val_probs = model.predict(val_gen)
+# === PREDICT PROBABILITIES ON VALIDATION SET ===
 val_labels = np.array(val_gen.classes)
-optimal_T, logits = optimize_temperature(val_probs, val_labels)
-print(f"[INFO] Optimal temperature for calibration: {optimal_T:.4f}")
+val_probs = model.predict(val_gen).squeeze()
 
-with open(os.path.join(output_dir, "optimal_temperature.txt"), "w") as f:
-    f.write(f"{optimal_T:.4f}\n")
+# === THRESHOLD SELECTION BASED ON TARGET RECALL (No temperature scaling) ===
+positive_indices = np.where(val_labels == 1)[0]
+positive_probs = val_probs[positive_indices]
+sorted_probs = np.sort(positive_probs)[::-1]
+num_required = int(np.ceil(target_recall * len(sorted_probs)))
+optimal_threshold = sorted_probs[num_required - 1]
 
-# === CUSTOM THRESHOLDING BASED ON TARGET RECALL ===
-print("[INFO] Calculating threshold to meet minimum recall using temperature scaling...")
-scaled_logits = logits / optimal_T
-scaled_probs = tf.sigmoid(scaled_logits).numpy()
+print(f"[INFO] Threshold chosen to ensure Recall ≥ {target_recall:.2f} on true positives only.")
+print(f"[INFO] Threshold = {optimal_threshold:.4f} yields recall = {target_recall:.2f} by construction.")
 
-target_recall = 0.90  # Adjust based on clinical needs
-precisions, recalls, thresholds = precision_recall_curve(val_labels, scaled_probs)
-
-recall_condition = recalls >= target_recall
-if np.any(recall_condition):
-    best_idx = np.argmax(recall_condition)
-    optimal_threshold = thresholds[best_idx]
-    print(f"[INFO] Selected threshold for Recall ≥ {target_recall:.2f}: {optimal_threshold:.4f}")
-    print(f"[INFO] Precision at selected threshold: {precisions[best_idx]:.4f}")
-    print(f"[INFO] Recall at selected threshold: {recalls[best_idx]:.4f}")
-else:
-    optimal_threshold = 0.5
-    print(f"[WARNING] No threshold found with Recall ≥ {target_recall:.2f}. Defaulting to 0.5")
-
-with open(os.path.join(output_dir, "optimal_threshold_val.txt"), "w") as f:
+# === SAVE THRESHOLD TO FILE ===
+with open(THRESHOLD_FILE, "w") as f:
     f.write(f"{optimal_threshold:.4f}\n")
+print(f"[INFO] Saved threshold to: {THRESHOLD_FILE}")
 
 # === TRAINING TIME ===
 elapsed_time = time.time() - start_time
