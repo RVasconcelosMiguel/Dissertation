@@ -7,7 +7,7 @@ import tensorflow as tf
 import time
 import random
 from scipy.optimize import minimize
-from sklearn.metrics import roc_curve
+from sklearn.metrics import roc_curve, precision_recall_curve
 from sklearn.utils.class_weight import compute_class_weight
 
 from tensorflow.keras.optimizers import Adam
@@ -126,7 +126,7 @@ base_model.trainable = True
 
 # === Unfreeze only selected BatchNormalization layers ===
 bn_layers = [layer for layer in base_model.layers if isinstance(layer, tf.keras.layers.BatchNormalization)]
-num_unfreeze = max(1, int(len(bn_layers) * 0.75))  # unfreeze last 50% of BN layers
+num_unfreeze = max(1, int(len(bn_layers) * 0.75))  # unfreeze last 75% of BN layers
 
 for layer in bn_layers[:-num_unfreeze]:
     layer.trainable = False
@@ -191,16 +191,24 @@ print(f"[INFO] Optimal temperature for calibration: {optimal_T:.4f}")
 with open(os.path.join(output_dir, "optimal_temperature.txt"), "w") as f:
     f.write(f"{optimal_T:.4f}\n")
 
-# === THRESHOLDING (Youden's J) ===
-print("[INFO] Calculating optimal threshold using Youden's J statistic with temperature scaling...")
+# === CUSTOM THRESHOLDING BASED ON TARGET RECALL ===
+print("[INFO] Calculating threshold to meet minimum recall using temperature scaling...")
 scaled_logits = logits / optimal_T
 scaled_probs = tf.sigmoid(scaled_logits).numpy()
 
-fpr, tpr, thresholds = roc_curve(val_labels, scaled_probs)
-youden_index = tpr - fpr
-optimal_idx = np.argmax(youden_index)
-optimal_threshold = thresholds[optimal_idx] if np.isfinite(thresholds[optimal_idx]) else 0.5
-print(f"[INFO] Optimal validation threshold (Youden's J) after temperature scaling: {optimal_threshold:.4f}")
+target_recall = 0.90  # Adjust based on clinical needs
+precisions, recalls, thresholds = precision_recall_curve(val_labels, scaled_probs)
+
+recall_condition = recalls >= target_recall
+if np.any(recall_condition):
+    best_idx = np.argmax(recall_condition)
+    optimal_threshold = thresholds[best_idx]
+    print(f"[INFO] Selected threshold for Recall ≥ {target_recall:.2f}: {optimal_threshold:.4f}")
+    print(f"[INFO] Precision at selected threshold: {precisions[best_idx]:.4f}")
+    print(f"[INFO] Recall at selected threshold: {recalls[best_idx]:.4f}")
+else:
+    optimal_threshold = 0.5
+    print(f"[WARNING] No threshold found with Recall ≥ {target_recall:.2f}. Defaulting to 0.5")
 
 with open(os.path.join(output_dir, "optimal_threshold_val.txt"), "w") as f:
     f.write(f"{optimal_threshold:.4f}\n")
