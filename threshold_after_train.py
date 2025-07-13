@@ -17,7 +17,7 @@ DROPOUT_F = 0.2
 L2_REG_H = 1e-3
 L2_REG_F = 1e-5
 
-target_recall = 0.75  # change to 0.95 or other if needed
+target_recall = 0.75  # Adjust based on how aggressive you want to be
 
 MODEL_DIR = "models/fine"
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}/fine"
@@ -25,7 +25,6 @@ MODEL_WEIGHTS_PATH = os.path.join(MODEL_DIR, f"{model_name}_fine_weights")
 TEMP_FILE = os.path.join(output_dir, "optimal_temperature.txt")
 THRESHOLD_FILE = os.path.join(output_dir, "optimal_threshold_val.txt")
 
-# === ENVIRONMENT SETUP ===
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
@@ -46,11 +45,11 @@ def optimize_temperature(val_probs, val_labels):
     )
     return opt_result.x[0], logits
 
-# === LOAD DATA ===
+# === LOAD VALIDATION DATA ===
 _, val_df, _, _, val_gen, _ = get_generators(IMG_SIZE, BATCH_SIZE)
 val_labels = np.array(val_gen.classes)
 
-# === BUILD MODEL ===
+# === LOAD MODEL ===
 model, base_model = build_model(
     model_name=model_name,
     img_size=IMG_SIZE,
@@ -62,7 +61,7 @@ model, base_model = build_model(
 model.load_weights(MODEL_WEIGHTS_PATH)
 print("[INFO] Model weights loaded.")
 
-# === PREDICT VALIDATION ===
+# === PREDICT PROBABILITIES ON VALIDATION SET ===
 val_probs = model.predict(val_gen).squeeze()
 
 # === TEMPERATURE SCALING ===
@@ -74,9 +73,8 @@ print(f"[INFO] Temperature scaling applied. T = {optimal_T:.4f}")
 scaled_logits = logits / optimal_T
 scaled_probs = tf.sigmoid(scaled_logits).numpy()
 
-# === CUSTOM THRESHOLDING BASED ON TARGET RECALL ===
+# === THRESHOLD SELECTION BASED ON TARGET RECALL ===
 precisions, recalls, thresholds = precision_recall_curve(val_labels, scaled_probs)
-
 recall_condition = recalls >= target_recall
 if np.any(recall_condition):
     best_idx = np.argmax(recall_condition)
@@ -87,7 +85,16 @@ else:
     optimal_threshold = 0.5
     print(f"[WARNING] No threshold found for Recall ≥ {target_recall:.2f}. Using default threshold: 0.5")
 
-# === SAVE THRESHOLD TO FILE ===
 with open(THRESHOLD_FILE, "w") as f:
     f.write(f"{optimal_threshold:.4f}\n")
 print(f"[INFO] Saved threshold to: {THRESHOLD_FILE}")
+
+# === ANALYSIS: DISPLAY CLASS 1 PROBABILITIES ===
+print("\n[INFO] Predicted probabilities for actual Class 1 samples (after temperature scaling):")
+positive_indices = np.where(val_labels == 1)[0]
+positive_probs = scaled_probs[positive_indices]
+
+# Print sorted by score (lowest → highest)
+sorted_indices = np.argsort(positive_probs)
+for rank, idx in enumerate(positive_indices[sorted_indices]):
+    print(f"Index: {idx:3d} | Prob: {scaled_probs[idx]:.4f}")
