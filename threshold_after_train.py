@@ -1,7 +1,6 @@
 import os
 import numpy as np
 import tensorflow as tf
-from sklearn.metrics import precision_recall_curve
 from scipy.optimize import minimize
 
 from model import build_model
@@ -17,7 +16,7 @@ DROPOUT_F = 0.2
 L2_REG_H = 1e-3
 L2_REG_F = 1e-5
 
-target_recall = 0.75  # Adjust based on how aggressive you want to be
+target_recall = 0.75  # Adjust to 0.90 or 0.95 depending on the desired recall
 
 MODEL_DIR = "models/fine"
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}/fine"
@@ -73,28 +72,26 @@ print(f"[INFO] Temperature scaling applied. T = {optimal_T:.4f}")
 scaled_logits = logits / optimal_T
 scaled_probs = tf.sigmoid(scaled_logits).numpy()
 
-# === THRESHOLD SELECTION BASED ON TARGET RECALL ===
-precisions, recalls, thresholds = precision_recall_curve(val_labels, scaled_probs)
-recall_condition = recalls >= target_recall
-if np.any(recall_condition):
-    best_idx = np.argmax(recall_condition)
-    optimal_threshold = thresholds[best_idx]
-    print(f"[INFO] Selected threshold for Recall ≥ {target_recall:.2f}: {optimal_threshold:.4f}")
-    print(f"[INFO] At threshold: Recall = {recalls[best_idx]:.4f}, Precision = {precisions[best_idx]:.4f}")
-else:
-    optimal_threshold = 0.5
-    print(f"[WARNING] No threshold found for Recall ≥ {target_recall:.2f}. Using default threshold: 0.5")
+# === SELECT THRESHOLD BASED ON TARGET RECALL OVER TRUE POSITIVES ONLY ===
+positive_indices = np.where(val_labels == 1)[0]
+positive_probs = scaled_probs[positive_indices]
 
+# Sort descending to find top k that achieve target recall
+sorted_probs = np.sort(positive_probs)[::-1]
+num_required = int(np.ceil(target_recall * len(sorted_probs)))
+optimal_threshold = sorted_probs[num_required - 1]
+
+print(f"[INFO] Threshold chosen to ensure Recall ≥ {target_recall:.2f} on true positives only.")
+print(f"[INFO] Threshold = {optimal_threshold:.4f} yields recall = {target_recall:.2f} by construction.")
+
+# === SAVE THRESHOLD TO FILE ===
 with open(THRESHOLD_FILE, "w") as f:
     f.write(f"{optimal_threshold:.4f}\n")
 print(f"[INFO] Saved threshold to: {THRESHOLD_FILE}")
 
-# === ANALYSIS: DISPLAY CLASS 1 PROBABILITIES ===
+# === ANALYSIS: DISPLAY SORTED TRUE POSITIVE PROBABILITIES ===
 print("\n[INFO] Predicted probabilities for actual Class 1 samples (after temperature scaling):")
-positive_indices = np.where(val_labels == 1)[0]
-positive_probs = scaled_probs[positive_indices]
-
-# Print sorted by score (lowest → highest)
 sorted_indices = np.argsort(positive_probs)
-for rank, idx in enumerate(positive_indices[sorted_indices]):
+for rank in sorted_indices:
+    idx = positive_indices[rank]
     print(f"Index: {idx:3d} | Prob: {scaled_probs[idx]:.4f}")
