@@ -17,7 +17,6 @@ from tensorflow.keras.optimizers.schedules import ExponentialDecay
 from model import build_model
 from data_loader import get_generators
 from plot_utils import plot_history_finetune_stages
-from losses import focal_loss
 
 # === SEED FOR REPRODUCIBILITY ===
 SEED = 42
@@ -39,7 +38,7 @@ DROPOUT_F = 0.2   # introduce base dropout in fine-tuning
 L2_REG_F = 1e-5
 
 THRESHOLD = 0.5
-CLASS_WEIGHTS_MULT_FINE = 2
+CLASS_WEIGHTS_MULT_FINE = 4
 
 # === PATHS ===
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}/fine"
@@ -148,7 +147,7 @@ optimizer = Adam(learning_rate=lr_schedule)
 
 model.compile(
     optimizer=optimizer,
-    loss = tf.keras.losses.BinaryCrossentropy(from_logits=False, label_smoothing=LABEL_SMOOTHING_F),
+    loss=tf.keras.losses.BinaryCrossentropy(from_logits=False, label_smoothing=LABEL_SMOOTHING_F),
     metrics=[
         tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=THRESHOLD),
         tf.keras.metrics.AUC(name="auc"),
