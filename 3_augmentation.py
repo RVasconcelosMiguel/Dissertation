@@ -84,7 +84,7 @@ print("Initial TRAIN class distribution:\n", label_counts)
 
 for cls in TARGET_COUNT_PER_CLASS:
     samples = train_df[train_df['label'] == cls]
-    samples = samples.sample(frac=1, random_state=42).reset_index(drop=True)  # shuffle deterministically
+    samples = samples.sample(frac=1, random_state=42).reset_index(drop=True)
 
     current_count = len(samples)
     target_count = TARGET_COUNT_PER_CLASS[cls]
@@ -130,7 +130,7 @@ for cls in TARGET_COUNT_PER_CLASS:
 
 # === Copy validation set (no augmentation) ===
 val_rows = []
-val_df = val_df.sample(frac=1, random_state=42).reset_index(drop=True)  # deterministic shuffle for consistency
+val_df = val_df.sample(frac=1, random_state=42).reset_index(drop=True)
 
 for _, row in val_df.iterrows():
     img_name = row['image']
