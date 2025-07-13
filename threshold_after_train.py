@@ -16,7 +16,7 @@ DROPOUT_F = 0.2
 L2_REG_H = 1e-3
 L2_REG_F = 1e-5
 
-target_recall = 0.80  # Adjust to 0.90 or 0.95 depending on the desired recall
+target_recall = 0.85  # Adjust to 0.90 or 0.95 depending on the desired recall
 
 MODEL_DIR = "models/fine"
 output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}/fine"
