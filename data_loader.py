@@ -5,12 +5,10 @@ import random
 import tensorflow as tf
 
 from seed_utils import set_global_seed
-set_global_seed(42)
-
+set_global_seed(42)  
 
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.applications.efficientnet import preprocess_input
-
 
 # === BASE PATHS ===
 BASE_PATH = "/raid/DATASETS/rmiguel_datasets/ISIC16/Classification/Split"
@@ -22,7 +20,7 @@ test_folder = os.path.join(BASE_PATH, "test")
 # === LOAD CSV DATAFRAMES ===
 def load_dataframes(csv_path):
     df = pd.read_csv(csv_path, header=None, names=['image', 'label'])
-    df['label'] = df['label'].astype(str)  # Convert labels to string for flow_from_dataframe compatibility
+    df['label'] = df['label'].astype(str)  # Required for flow_from_dataframe compatibility
     return df
 
 # === DATA GENERATORS FUNCTION ===
@@ -50,13 +48,17 @@ def get_generators(img_size, batch_size):
         shear_range=15,
         zoom_range=0.2,
         horizontal_flip=True,
-        vertical_flip=True,  # Disable for dermoscopy unless orientation invariant
+        vertical_flip=True,
         brightness_range=[0.8,1.2],
-        fill_mode='nearest'
+        fill_mode='nearest',
+        seed=42  
     )
 
     # === Define preprocessing only for validation and test sets ===
-    test_val_datagen = ImageDataGenerator(preprocessing_function=preprocess_input)
+    test_val_datagen = ImageDataGenerator(
+        preprocessing_function=preprocess_input
+        # Not randomized → no seed needed
+    )
 
     # === Training generator ===
     train_gen = train_datagen.flow_from_dataframe(
@@ -68,7 +70,7 @@ def get_generators(img_size, batch_size):
         class_mode="binary",
         batch_size=batch_size,
         shuffle=True,
-        seed=42
+        seed=42  
     )
 
     # === Validation generator ===
@@ -80,7 +82,7 @@ def get_generators(img_size, batch_size):
         target_size=(img_size, img_size),
         class_mode="binary",
         batch_size=batch_size,
-        shuffle=False
+        shuffle=False 
     )
 
     # === Test generator ===
@@ -96,4 +98,3 @@ def get_generators(img_size, batch_size):
     )
 
     return train_df, val_df, test_df, train_gen, val_gen, test_gen
-
