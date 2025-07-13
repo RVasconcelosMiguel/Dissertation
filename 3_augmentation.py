@@ -1,11 +1,19 @@
 import os
 import shutil
 import pandas as pd
+import random
 import numpy as np
 from PIL import Image
 from tqdm import tqdm
 import albumentations as A
 from sklearn.model_selection import train_test_split
+
+# === Set random seed for reproducibility ===
+SEED = 42
+random.seed(SEED)
+np.random.seed(SEED)
+A.set_seed(SEED)
+
 
 # === Define target final number of images per class ===
 TARGET_COUNT_PER_CLASS = {
