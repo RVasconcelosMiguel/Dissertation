@@ -45,7 +45,7 @@ print(f"[INFO] Fine-tuned model evaluation started at: {time.ctime(start_time)}"
 try:
     with open(threshold_path, "r") as f:
         optimal_threshold = float(f.read().strip())
-        optimal_threshold = 0.3
+        #optimal_threshold = 0.2748
     print(f"[INFO] Loaded optimal threshold: {optimal_threshold:.4f}")
 except FileNotFoundError:
     raise FileNotFoundError(f"[ERROR] Optimal threshold file not found at {threshold_path}")
