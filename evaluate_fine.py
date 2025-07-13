@@ -135,6 +135,14 @@ print("[INFO] Predicted probabilities for False Negatives (should be class 1):")
 for idx in false_negatives_idx:
     print(f"Index: {idx}, Prob: {y_prob[idx]:.4f}")
 
+# === Print false positives with their prediction probabilities ===
+false_positives_idx = np.where((y_true == 0) & (y_pred == 1))[0]
+
+print(f"\n[INFO] Number of False Positives: {len(false_positives_idx)}")
+print("[INFO] Predicted probabilities for False Positives (should be class 0):")
+for idx in false_positives_idx:
+    print(f"Index: {idx}, Prob: {y_prob[idx]:.4f}")
+
 # === Save Confusion Matrix ===
 conf_matrix_path = os.path.join(output_dir, "confusion_matrix_finetune.png")
 save_confusion_matrix(y_true, y_pred, labels, conf_matrix_path)
