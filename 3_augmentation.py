@@ -12,7 +12,6 @@ from seed_utils import set_global_seed
 set_global_seed(42)
 
 import albumentations as A
-A.set_seed(42)
 
 # === Define target final number of images per class ===
 TARGET_COUNT_PER_CLASS = {

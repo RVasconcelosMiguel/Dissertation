@@ -7,8 +7,8 @@ conda activate rm_dermo_env
 
 
 #Initialization
-echo "=== Preprocess ==="
-python 2_preprocess.py | tee ../files_to_transfer/preprocess_log.txt
+#echo "=== Preprocess ==="
+#python 2_preprocess.py | tee ../files_to_transfer/preprocess_log.txt
 
 echo "=== Augmentation ==="
 python 3_augmentation.py | tee ../files_to_transfer/aug_log.txt
