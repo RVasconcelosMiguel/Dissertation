@@ -5,7 +5,7 @@ import random
 import tensorflow as tf
 
 from seed_utils import set_global_seed
-set_global_seed(42)  
+set_global_seed(42)
 
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.applications.efficientnet import preprocess_input
@@ -49,9 +49,9 @@ def get_generators(img_size, batch_size):
         zoom_range=0.2,
         horizontal_flip=True,
         vertical_flip=True,
-        brightness_range=[0.8,1.2],
-        fill_mode='nearest',
-        seed=42  
+        brightness_range=[0.8, 1.2],
+        fill_mode='nearest'
+        # ❌ Removed: seed=42 (invalid argument)
     )
 
     # === Define preprocessing only for validation and test sets ===
@@ -70,7 +70,7 @@ def get_generators(img_size, batch_size):
         class_mode="binary",
         batch_size=batch_size,
         shuffle=True,
-        seed=42  
+        seed=42  # ✅ Correct usage
     )
 
     # === Validation generator ===
@@ -82,7 +82,7 @@ def get_generators(img_size, batch_size):
         target_size=(img_size, img_size),
         class_mode="binary",
         batch_size=batch_size,
-        shuffle=False 
+        shuffle=False
     )
 
     # === Test generator ===
