@@ -106,6 +106,7 @@ for key in input_folders:
         #img_sharp = Image.merge('RGB', (r, g, b))
 
         # === Save processed image ===
-        img_rgb.save(processed_path) #img_sharp.save(processed_path)
+        img_pil = Image.fromarray(img_rgb) #img_sharp.save(processed_path)
+        img_pil.save(processed_path)       #img_sharp.save(processed_path)
 
     print(f"{key.upper()}: {len(all_images)} images processed.")
