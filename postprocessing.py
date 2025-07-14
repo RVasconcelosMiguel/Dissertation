@@ -16,6 +16,7 @@ L2_REG_H = 1e-3
 L2_REG_F = 1e-5
 
 target_recall = 0.85  # Adjust to 0.90 or 0.95 depending on the desired recall
+MIN_THRESHOLD = 0.3  
 
 # === PATHS (aligned with train_finetune.py) ===
 MODEL_DIR = "outputs/fine/model"
@@ -56,6 +57,10 @@ optimal_threshold = sorted_probs[num_required - 1]
 
 print(f"[INFO] Threshold chosen to ensure Recall ≥ {target_recall:.2f} on true positives only.")
 print(f"[INFO] Threshold = {optimal_threshold:.4f} yields recall = {target_recall:.2f} by construction.")
+
+if optimal_threshold < MIN_THRESHOLD:
+    print(f"[WARN] Threshold ({optimal_threshold:.4f}) below MIN_THRESHOLD ({MIN_THRESHOLD}). Applying minimum.")
+    optimal_threshold = MIN_THRESHOLD
 
 # === SAVE THRESHOLD TO FILE ===
 with open(THRESHOLD_FILE, "w") as f:
