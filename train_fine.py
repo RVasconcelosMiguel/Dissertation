@@ -44,14 +44,14 @@ CLASS_WEIGHTS_MULT_FINE = 4
 target_recall = 0.82  # your best recall target
 
 # === PATHS ===
-output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}/fine"
-MODEL_DIR = "models/fine"
+output_dir = "outputs/fine"
+MODEL_DIR = "outputs/fine_model"
 os.makedirs(output_dir, exist_ok=True)
 os.makedirs(MODEL_DIR, exist_ok=True)
 
 MODEL_WEIGHTS_PATH = os.path.join(MODEL_DIR, f"{model_name}_fine_weights")
-HEAD_WEIGHTS_PATH = os.path.join("models/head", f"{model_name}_head_weights")
-THRESHOLD_FILE = os.path.join(output_dir, "optimal_threshold_val.txt")
+HEAD_WEIGHTS_PATH = os.path.join("outputs/head_model", f"{model_name}_head_weights")
+THRESHOLD_FILE = os.path.join(MODEL_DIR, "optimal_threshold_val.txt")
 
 # === ENVIRONMENT SETUP ===
 start_time = time.time()

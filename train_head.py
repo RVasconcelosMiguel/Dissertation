@@ -49,8 +49,8 @@ lr_schedule = ExponentialDecay(
 )
 
 # === PATHS ===
-output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}/head"
-MODEL_DIR = "models/head"
+output_dir = "outputs/head"
+MODEL_DIR = "outputs/head_model"
 MODEL_WEIGHTS_PATH = os.path.join(MODEL_DIR, f"{model_name}_head_weights")
 FULL_MODEL_PATH = os.path.join(MODEL_DIR, f"{model_name}_head_model")
 

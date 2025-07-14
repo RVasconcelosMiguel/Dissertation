@@ -24,8 +24,8 @@ BATCH_SIZE = 16
 THRESHOLD = 0.5
 
 # === Paths ===
-output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}/head"
-MODEL_DIR = "models/head"
+output_dir = "outputs/head"
+MODEL_DIR = "outputs/head_model"
 MODEL_WEIGHTS_PATH = os.path.join(MODEL_DIR, f"{model_name}_head_weights")
 
 os.makedirs(output_dir, exist_ok=True)

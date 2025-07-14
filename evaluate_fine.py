@@ -24,10 +24,10 @@ IMG_SIZE = 380
 BATCH_SIZE = 16
 
 # === Paths ===
-output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}/fine"
-MODEL_DIR = "models/fine"
+output_dir = "outputs/fine"
+MODEL_DIR = "outputs/fine_model"
 MODEL_WEIGHTS_PATH = os.path.join(MODEL_DIR, f"{model_name}_fine_weights")
-threshold_path = os.path.join(output_dir, "optimal_threshold_val.txt")
+threshold_path = os.path.join(MODEL_DIR, "optimal_threshold_val.txt")
 
 # === Ensure output directory exists ===
 os.makedirs(output_dir, exist_ok=True)
