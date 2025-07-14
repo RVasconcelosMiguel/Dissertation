@@ -4,8 +4,8 @@ import numpy as np
 import random
 import tensorflow as tf
 
-from seed_utils import set_global_seed
-set_global_seed(42)
+#from seed_utils import set_global_seed
+#set_global_seed(42)
 
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.applications.efficientnet import preprocess_input

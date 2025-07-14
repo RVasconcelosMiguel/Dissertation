@@ -3,8 +3,8 @@
 import os
 
 # === SEED FOR REPRODUCIBILITY ===
-from seed_utils import set_global_seed
-set_global_seed(42)
+#from seed_utils import set_global_seed
+#set_global_seed(42)
 
 import pickle
 import numpy as np

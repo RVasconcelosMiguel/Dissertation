@@ -2,10 +2,9 @@
 
 import os
 
-# === ENVIRONMENT FIX FOR BATCHNORM DETERMINISM BUG ===
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'  # ✅ <- ADD THIS LINE
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+# === ENVIRONMENT FIX FOR BATCHNORM DETERMINISM ===
+#os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+#os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'  # <- ADD THIS LINE
 
 import pickle
 import numpy as np
@@ -24,8 +23,8 @@ from data_loader import get_generators
 from plot_utils import plot_history_finetune_stages
 
 # === SEED FOR REPRODUCIBILITY ===
-from seed_utils import set_global_seed
-set_global_seed(42)
+#from seed_utils import set_global_seed
+#set_global_seed(42)
 
 # === CONFIGURATION ===
 model_name = "efficientnetb4"

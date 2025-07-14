@@ -5,6 +5,9 @@ eval "$(conda shell.bash hook)"
 conda activate rm_dermo_env
 
 
+#Data Load
+#echo "=== Data Load ==="
+#python 1_dataset_load.py | tee ../files_to_transfer/load_log.txt
 
 #Initialization
 #echo "=== Preprocess ==="

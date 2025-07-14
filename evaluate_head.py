@@ -3,8 +3,8 @@
 import os
 
 # === Set deterministic behavior BEFORE importing TensorFlow ===
-from seed_utils import set_global_seed
-set_global_seed(42)
+#from seed_utils import set_global_seed
+#set_global_seed(42)
 
 import time
 import random
