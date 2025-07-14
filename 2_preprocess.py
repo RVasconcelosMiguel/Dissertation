@@ -4,9 +4,6 @@ import shutil
 from PIL import Image, ImageFilter, ImageChops
 from tqdm import tqdm
 
-from seed_utils import set_global_seed
-set_global_seed(42)
-
 # === CONFIGURATION ===
 use_binary_mask = True  # Set to False to disable mask application
 

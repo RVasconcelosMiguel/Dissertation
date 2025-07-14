@@ -17,11 +17,12 @@ L2_REG_F = 1e-5
 
 target_recall = 0.82  # Adjust to 0.90 or 0.95 depending on the desired recall
 
-MODEL_DIR = "models/fine"
-output_dir = f"/home/jtstudents/rmiguel/files_to_transfer/{model_name}/fine"
+# === PATHS (aligned with train_finetune.py) ===
+MODEL_DIR = "outputs/fine/model"
 MODEL_WEIGHTS_PATH = os.path.join(MODEL_DIR, f"{model_name}_fine_weights")
-THRESHOLD_FILE = os.path.join(output_dir, "optimal_threshold_val.txt")
+THRESHOLD_FILE = os.path.join(MODEL_DIR, "optimal_threshold_val.txt")
 
+# === ENVIRONMENT SETUP ===
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 

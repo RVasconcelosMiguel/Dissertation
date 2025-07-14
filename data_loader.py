@@ -1,12 +1,5 @@
 import os
 import pandas as pd
-import numpy as np
-import random
-import tensorflow as tf
-
-#from seed_utils import set_global_seed
-#set_global_seed(42)
-
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.applications.efficientnet import preprocess_input
 
@@ -20,7 +13,7 @@ test_folder = os.path.join(BASE_PATH, "test")
 # === LOAD CSV DATAFRAMES ===
 def load_dataframes(csv_path):
     df = pd.read_csv(csv_path, header=None, names=['image', 'label'])
-    df['label'] = df['label'].astype(str)  # Required for flow_from_dataframe compatibility
+    df['label'] = df['label'].astype(str)  # Convert labels to string for flow_from_dataframe compatibility
     return df
 
 # === DATA GENERATORS FUNCTION ===
@@ -48,17 +41,13 @@ def get_generators(img_size, batch_size):
         shear_range=15,
         zoom_range=0.2,
         horizontal_flip=True,
-        vertical_flip=True,
-        brightness_range=[0.8, 1.2],
+        vertical_flip=True,  # Disable for dermoscopy unless orientation invariant
+        brightness_range=[0.8,1.2],
         fill_mode='nearest'
-        # ❌ Removed: seed=42 (invalid argument)
     )
 
     # === Define preprocessing only for validation and test sets ===
-    test_val_datagen = ImageDataGenerator(
-        preprocessing_function=preprocess_input
-        # Not randomized → no seed needed
-    )
+    test_val_datagen = ImageDataGenerator(preprocessing_function=preprocess_input)
 
     # === Training generator ===
     train_gen = train_datagen.flow_from_dataframe(
@@ -70,7 +59,7 @@ def get_generators(img_size, batch_size):
         class_mode="binary",
         batch_size=batch_size,
         shuffle=True,
-        seed=42  # ✅ Correct usage
+        seed=42
     )
 
     # === Validation generator ===

@@ -1,22 +1,15 @@
 # === evaluate_finetune.py ===
 
 import os
-
-# === Set deterministic behavior BEFORE importing TensorFlow ===
-#from seed_utils import set_global_seed
-#set_global_seed(42)
-
 import time
-import random
-import numpy as np
 import tensorflow as tf
+import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import classification_report, roc_auc_score, confusion_matrix
 
 from model import build_model
 from data_loader import get_generators
 from plot_utils import save_confusion_matrix, save_roc_curve
-
 
 # === CONFIGURATION ===
 model_name = "efficientnetb4"
@@ -52,7 +45,6 @@ print(f"[INFO] Fine-tuned model evaluation started at: {time.ctime(start_time)}"
 try:
     with open(threshold_path, "r") as f:
         optimal_threshold = float(f.read().strip())
-        #optimal_threshold = 0.2748
     print(f"[INFO] Loaded optimal threshold: {optimal_threshold:.4f}")
 except FileNotFoundError:
     raise FileNotFoundError(f"[ERROR] Optimal threshold file not found at {threshold_path}")
@@ -134,22 +126,6 @@ print(f"Accuracy: {report['accuracy']:.4f}")
 print(f"AUC: {roc_auc:.4f}")
 print(f"Sensitivity (Recall): {sensitivity:.4f}")
 print(f"Specificity: {specificity:.4f}")
-
-# === Print false negatives with their prediction probabilities ===
-false_negatives_idx = np.where((y_true == 1) & (y_pred == 0))[0]
-
-print(f"\n[INFO] Number of False Negatives: {len(false_negatives_idx)}")
-print("[INFO] Predicted probabilities for False Negatives (should be class 1):")
-for idx in false_negatives_idx:
-    print(f"Index: {idx}, Prob: {y_prob[idx]:.4f}")
-
-# === Print false positives with their prediction probabilities ===
-false_positives_idx = np.where((y_true == 0) & (y_pred == 1))[0]
-
-print(f"\n[INFO] Number of False Positives: {len(false_positives_idx)}")
-print("[INFO] Predicted probabilities for False Positives (should be class 0):")
-for idx in false_positives_idx:
-    print(f"Index: {idx}, Prob: {y_prob[idx]:.4f}")
 
 # === Save Confusion Matrix ===
 conf_matrix_path = os.path.join(output_dir, "confusion_matrix_finetune.png")

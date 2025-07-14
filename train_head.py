@@ -1,13 +1,6 @@
 # === train_head.py ===
 
 import os
-
-# === SEED FOR REPRODUCIBILITY ===
-SEED = 42
-tf.random.set_seed(SEED)
-np.random.seed(SEED)
-random.seed(SEED)
-
 import pickle
 import numpy as np
 import tensorflow as tf
@@ -29,7 +22,7 @@ IMG_SIZE = 380
 BATCH_SIZE = 16
 
 # Head training configuration
-EPOCHS_HEAD = 25
+EPOCHS_HEAD = 2#25
 LEARNING_RATE_HEAD = 5e-5
 LABEL_SMOOTHING_H = 0.04
 

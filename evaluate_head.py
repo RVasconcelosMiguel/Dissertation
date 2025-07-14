@@ -1,15 +1,9 @@
 # === evaluate_head.py ===
 
 import os
-
-# === Set deterministic behavior BEFORE importing TensorFlow ===
-#from seed_utils import set_global_seed
-#set_global_seed(42)
-
 import time
-import random
-import numpy as np
 import tensorflow as tf
+import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import classification_report, roc_auc_score, confusion_matrix
 

@@ -1,22 +1,16 @@
 import os
 import shutil
 import pandas as pd
+import numpy as np
 from PIL import Image
 from tqdm import tqdm
-from sklearn.model_selection import train_test_split
-import numpy as np
-import random
-
-# === GLOBAL SEED FOR FULL REPRODUCIBILITY ===
-from seed_utils import set_global_seed
-set_global_seed(42)
-
 import albumentations as A
+from sklearn.model_selection import train_test_split
 
 # === Define target final number of images per class ===
 TARGET_COUNT_PER_CLASS = {
     0: 509,  # class 0 (benign)
-    1: 509   # class 1 (malignant)
+    1: 509    # class 1 (malignant)
 }
 
 # === Paths ===
@@ -27,6 +21,7 @@ preprocessed_train_images_path = "/raid/DATASETS/rmiguel_datasets/ISIC16/Classif
 preprocessed_test_images_path = "/raid/DATASETS/rmiguel_datasets/ISIC16/Classification/Preprocessed_Testing_Data"
 
 output_base_path = "/raid/DATASETS/rmiguel_datasets/ISIC16/Classification/Split"
+
 train_folder = os.path.join(output_base_path, "train")
 val_folder = os.path.join(output_base_path, "val")
 test_folder = os.path.join(output_base_path, "test")
@@ -34,35 +29,41 @@ test_folder = os.path.join(output_base_path, "test")
 # === Safety Check ===
 assert "rmiguel_datasets" in output_base_path, "Unsafe output path. Aborting."
 
-# === Re-create output folders ===
+# === Create folders ===
 for folder in [train_folder, val_folder, test_folder]:
     if os.path.exists(folder):
         print(f"[INFO] Deleting existing folder: {folder}")
         shutil.rmtree(folder)
     os.makedirs(folder, exist_ok=True)
 
-# === Copy test set images ===
-test_images = sorted([f for f in os.listdir(preprocessed_test_images_path) if f.endswith(('.jpg', '.png'))])
-for img_name in tqdm(test_images, desc="Copying test images"):
-    src = os.path.join(preprocessed_test_images_path, img_name)
-    dst = os.path.join(test_folder, img_name)
-    shutil.copy2(src, dst)
+# === Testing images ===
+test_images = [f for f in os.listdir(preprocessed_test_images_path) if f.endswith('.jpg') or f.endswith('.png')]
 
-# === Process test CSV ===
+for img_name in tqdm(test_images, desc="Copying test images"):
+    src_path = os.path.join(preprocessed_test_images_path, img_name)
+    dst_path = os.path.join(test_folder, img_name)
+    shutil.copy2(src_path, dst_path)
+
+# === Testing CSV ===
 test_df = pd.read_csv(original_test_csv_path, header=None, names=["image", "label"])
+
 test_df['image'] = test_df['image'].astype(str).apply(lambda x: x if x.endswith('.jpg') else x + '.jpg')
+
 if test_df['label'].dtype == object:
     test_df['label'] = test_df['label'].map({'benign': 0, 'malignant': 1})
-test_df['label'] = test_df['label'].astype(int)
-test_df.to_csv(os.path.join(test_folder, "test_labels.csv"), index=False, header=False)
-print("[INFO] Test CSV saved.")
 
-# === Load and prepare training set ===
+test_df['label'] = test_df['label'].astype(int)
+
+test_df.to_csv(os.path.join(test_folder, "test_labels.csv"), index=False, header=False)
+
+print("[INFO] Test CSV copied and saved with consistent formatting.")
+
+# === Training CSV Load ===
 df = pd.read_csv(original_train_csv_path, header=None, names=["image", "label"])
 df['image'] = df['image'].astype(str).apply(lambda x: x if x.endswith('.jpg') else x + '.jpg')
 df['label'] = df['label'].map({'benign': 0, 'malignant': 1}).astype(int)
 
-# === Stratified train-validation split ===
+# === Split before augmentation ===
 train_df, val_df = train_test_split(df, stratify=df['label'], test_size=0.30, random_state=42)
 
 # === Augmentation pipeline ===
@@ -76,19 +77,21 @@ augment = A.Compose([
     A.ISONoise(color_shift=(0.01, 0.01), intensity=(0.01, 0.03), p=0.1),
 ])
 
-# === Augment training set ===
+
+# === Augment training set to reach target per class ===
 train_aug_rows = []
+
 label_counts = train_df['label'].value_counts()
-print("Initial TRAIN class distribution:\n", label_counts)
+print("Initial TRAIN class distribution:")
+print(label_counts)
 
-for cls in TARGET_COUNT_PER_CLASS:
-    samples = train_df[train_df['label'] == cls]
-    samples = samples.sample(frac=1, random_state=42).reset_index(drop=True)
-
-    current_count = len(samples)
+for cls in TARGET_COUNT_PER_CLASS.keys():
     target_count = TARGET_COUNT_PER_CLASS[cls]
 
-    # Copy original samples
+    samples = train_df[train_df['label'] == cls]
+    current_count = len(samples)
+
+    # Copy originals
     for _, row in samples.iterrows():
         img_name = row['image']
         src = os.path.join(preprocessed_train_images_path, img_name)
@@ -96,7 +99,6 @@ for cls in TARGET_COUNT_PER_CLASS:
         shutil.copy2(src, dst)
         train_aug_rows.append({'image': img_name, 'label': cls})
 
-    # Perform augmentation if needed
     augment_needed = target_count - current_count
     if augment_needed <= 0:
         print(f"Class {cls} already has {current_count} samples. No augmentation needed.")
@@ -105,7 +107,7 @@ for cls in TARGET_COUNT_PER_CLASS:
     augment_times = augment_needed // current_count
     remainder = augment_needed % current_count
 
-    print(f"Class {cls}: generating {augment_needed} augmented images...")
+    print(f"Class {cls}: augmenting {current_count} images to generate {augment_needed} new images (target total: {target_count}).")
 
     for idx, (_, row) in enumerate(tqdm(samples.iterrows(), total=current_count, desc=f"Augmenting class {cls}")):
         img_name = row['image']
@@ -119,17 +121,18 @@ for cls in TARGET_COUNT_PER_CLASS:
             continue
 
         reps = augment_times + (1 if idx < remainder else 0)
+
         for i in range(reps):
             augmented = augment(image=img_np)
             aug_img = Image.fromarray(augmented['image'])
-            new_name = f"{os.path.splitext(img_name)[0]}_aug_{i}.jpg"
+            base = os.path.splitext(img_name)[0]
+            new_name = f"{base}_aug_{i}.jpg"
             save_path = os.path.join(train_folder, new_name)
             aug_img.save(save_path)
             train_aug_rows.append({'image': new_name, 'label': cls})
 
-# === Copy validation set (no augmentation) ===
+# === Process validation set (copy only, no augmentation) ===
 val_rows = []
-val_df = val_df.sample(frac=1, random_state=42).reset_index(drop=True)
 
 for _, row in val_df.iterrows():
     img_name = row['image']
@@ -138,10 +141,10 @@ for _, row in val_df.iterrows():
     shutil.copy2(src, dst)
     val_rows.append({'image': img_name, 'label': row['label']})
 
-# === Save final CSVs ===
-pd.DataFrame(train_aug_rows).to_csv(os.path.join(train_folder, "train_labels.csv"), index=False, header=False)
-pd.DataFrame(val_rows).to_csv(os.path.join(val_folder, "val_labels.csv"), index=False, header=False)
+# === Save CSVs ===
+pd.DataFrame(train_aug_rows).to_csv(os.path.join(output_base_path, "train/train_labels.csv"), index=False, header=False)
+pd.DataFrame(val_rows).to_csv(os.path.join(output_base_path, "val/val_labels.csv"), index=False, header=False)
 
 print(f"\n[INFO] Final TRAIN images: {len(train_aug_rows)}")
 print(f"[INFO] Final VAL images: {len(val_rows)}")
-print("[INFO] CSV files saved successfully.")
+print("[INFO] CSV files saved.")
