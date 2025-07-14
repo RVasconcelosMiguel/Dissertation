@@ -3,8 +3,10 @@
 import os
 
 # === SEED FOR REPRODUCIBILITY ===
-#from seed_utils import set_global_seed
-#set_global_seed(42)
+SEED = 42
+tf.random.set_seed(SEED)
+np.random.seed(SEED)
+random.seed(SEED)
 
 import pickle
 import numpy as np

@@ -23,8 +23,10 @@ from data_loader import get_generators
 from plot_utils import plot_history_finetune_stages
 
 # === SEED FOR REPRODUCIBILITY ===
-#from seed_utils import set_global_seed
-#set_global_seed(42)
+SEED = 42
+tf.random.set_seed(SEED)
+np.random.seed(SEED)
+random.seed(SEED)
 
 # === CONFIGURATION ===
 model_name = "efficientnetb4"
@@ -95,8 +97,8 @@ class_weights_fine = compute_class_weights(train_df)
 class_weights_fine[1] *= CLASS_WEIGHTS_MULT_FINE
 print("Adjusted class weights (fine-tuning) :", class_weights_fine)
 
-from tensorflow.keras.layers import BatchNormalization
-BatchNormalization._USE_V2_BEHAVIOR = False
+#from tensorflow.keras.layers import BatchNormalization
+#BatchNormalization._USE_V2_BEHAVIOR = False
 
 # === MODEL CONSTRUCTION ===
 model, base_model = build_model(
