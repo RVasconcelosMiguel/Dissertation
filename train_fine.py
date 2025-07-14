@@ -1,6 +1,12 @@
 # === train_finetune.py ===
 
 import os
+
+# === ENVIRONMENT FIX FOR BATCHNORM DETERMINISM BUG ===
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'  # ✅ <- ADD THIS LINE
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+
 import pickle
 import numpy as np
 import tensorflow as tf

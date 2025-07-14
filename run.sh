@@ -29,5 +29,5 @@ python evaluate_head.py | tee ../files_to_transfer/efficientnetb4/head/evaluate_
 echo "=== TRAINING FINE ==="
 python train_fine.py | tee ../files_to_transfer/efficientnetb4/fine/train_fine_log.txt
 
-echo "=== EVALUATION HEAD ==="
+echo "=== EVALUATION FINE ==="
 python evaluate_fine.py | tee ../files_to_transfer/efficientnetb4/fine/evaluate_fine_log.txt
