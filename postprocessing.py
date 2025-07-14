@@ -68,7 +68,7 @@ with open(THRESHOLD_FILE, "w") as f:
 print(f"[INFO] Saved threshold to: {THRESHOLD_FILE}")
 
 # === ANALYSIS: DISPLAY SORTED TRUE POSITIVE PROBABILITIES ===
-print("\n[INFO] Predicted probabilities for actual Class 1 samples (raw, no temperature scaling):")
+print("\n[INFO] Predicted probabilities for actual Class 1 samples (raw, no temperature scaling) :")
 sorted_indices = np.argsort(positive_probs)
 for rank in sorted_indices:
     idx = positive_indices[rank]
