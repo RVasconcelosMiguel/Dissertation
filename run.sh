@@ -29,11 +29,11 @@ python evaluate_head.py | tee outputs/head/results/evaluate_head_log.txt
 
 
 # Run the FINE training and evaluation scripts
-echo "=== TRAINING FINE ==="
-python train_fine.py | tee outputs/fine/results/train_fine_log.txt
+#echo "=== TRAINING FINE ==="
+#python train_fine.py | tee outputs/fine/results/train_fine_log.txt
 
-echo "=== POSTPROCESSING ==="
-python postprocessing.py | tee outputs/fine/results/postprocessing_log.txt
+#echo "=== POSTPROCESSING ==="
+#python postprocessing.py | tee outputs/fine/results/postprocessing_log.txt
 
-echo "=== EVALUATION FINE ==="
-python evaluate_fine.py | tee outputs/fine/results/evaluate_fine_log.txt
+#echo "=== EVALUATION FINE ==="
+#python evaluate_fine.py | tee outputs/fine/results/evaluate_fine_log.txt
