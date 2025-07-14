@@ -4,7 +4,7 @@
 eval "$(conda shell.bash hook)"
 conda activate rm_dermo_env
 
-
+python dir_creator.py
 
 #Data Load
 #echo "=== Data Load ==="

@@ -5,13 +5,6 @@ import subprocess
 dataset_root = "/raid/DATASETS/rmiguel_datasets/ISIC16"
 os.makedirs(dataset_root, exist_ok=True)
 
-# Create output folder for model, logs and PNGs
-current_dir = os.path.dirname(os.path.abspath(__file__))
-outputs_dir_1 = os.path.join(current_dir, "outputs/head")
-os.makedirs(outputs_dir_1, exist_ok=True)
-outputs_dir_2 = os.path.join(current_dir, "outputs/fine")
-os.makedirs(outputs_dir_2, exist_ok=True)
-
 # === Dataset download + extraction configuration ===
 datasets = {
     "train_images": {
