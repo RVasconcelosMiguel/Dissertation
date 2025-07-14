@@ -46,7 +46,7 @@ target_recall = 0.82  # your best recall target
 # === PATHS ===
 output_dir = "outputs/fine/results"
 MODEL_DIR = "outputs/fine/model"
-HEAD_DIR = "outputs/fine/model"
+HEAD_DIR = "outputs/head/model"
 os.makedirs(output_dir, exist_ok=True)
 os.makedirs(MODEL_DIR, exist_ok=True)
 
