@@ -24,8 +24,8 @@ IMG_SIZE = 380
 BATCH_SIZE = 16
 
 # === Paths ===
-output_dir = "outputs/fine"
-MODEL_DIR = "outputs/fine_model"
+output_dir = "outputs/fine/results"
+MODEL_DIR = "outputs/fine/model"
 MODEL_WEIGHTS_PATH = os.path.join(MODEL_DIR, f"{model_name}_fine_weights")
 threshold_path = os.path.join(MODEL_DIR, "optimal_threshold_val.txt")
 

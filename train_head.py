@@ -49,8 +49,8 @@ lr_schedule = ExponentialDecay(
 )
 
 # === PATHS ===
-output_dir = "outputs/head"
-MODEL_DIR = "outputs/head_model"
+output_dir = "outputs/head/results"
+MODEL_DIR = "outputs/head/model"
 MODEL_WEIGHTS_PATH = os.path.join(MODEL_DIR, f"{model_name}_head_weights")
 FULL_MODEL_PATH = os.path.join(MODEL_DIR, f"{model_name}_head_model")
 

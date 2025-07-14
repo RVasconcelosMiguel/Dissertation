@@ -21,16 +21,16 @@ python 3_augmentation.py | tee outputs/aug_log.txt
 
 # Run the HEAD training and evaluation scripts
 echo "=== TRAINING HEAD ==="
-python train_head.py | tee outputs/head/train_head_log.txt
+python train_head.py | tee outputs/head/results/train_head_log.txt
 
 echo "=== EVALUATION HEAD ==="
-python evaluate_head.py | tee outputs/head/evaluate_head_log.txt
+python evaluate_head.py | tee outputs/head/results/evaluate_head_log.txt
 
 
 
 # Run the FINE training and evaluation scripts
 echo "=== TRAINING FINE ==="
-python train_fine.py | tee outputs/fine/train_fine_log.txt
+python train_fine.py | tee outputs/fine/results/train_fine_log.txt
 
 echo "=== EVALUATION FINE ==="
-python evaluate_fine.py | tee outputs/fine/evaluate_fine_log.txt
+python evaluate_fine.py | tee outputs/fine/results/evaluate_fine_log.txt
