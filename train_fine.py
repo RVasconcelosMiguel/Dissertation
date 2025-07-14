@@ -116,7 +116,7 @@ for layer in bn_layers[:-num_unfreeze]:
 for layer in bn_layers[-num_unfreeze:]:
     layer.trainable = True
 
-print(f"[INFO] Unfroze the last {num_unfreeze} BatchNormalization layers for adaptation.")
+print(f"[INFO] Unfroze the last {num_unfreeze} BatchNormalization layers for adaptation. ")
 
 # === COMPILE MODEL ===
 lr_schedule = ExponentialDecay(
