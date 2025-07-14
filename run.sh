@@ -11,7 +11,7 @@ conda activate rm_dermo_env
 #python 1_dataset_load.py | tee outputs/load_log.txt
 
 #Initialization
-echo "=== Preprocess ==="
+#echo "=== Preprocess ==="
 python 2_preprocess.py | tee outputs/preprocess_log.txt
 
 echo "=== Augmentation ==="
