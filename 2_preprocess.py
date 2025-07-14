@@ -94,7 +94,7 @@ for key in input_folders:
 
         # === Preprocessing pipeline ===
         #img_rgb = remove_hairs(img_rgb)
-        #img_rgb = apply_clahe_rgb(img_rgb)    
+        img_rgb = apply_clahe_rgb(img_rgb)    
        
 
         # === Channel sharpening ===
