@@ -93,19 +93,20 @@ for key in input_folders:
                 print(f"Mask not found for: {image_name}")
 
         # === Preprocessing pipeline ===
-        #img_rgb = remove_hairs(img_rgb)
+        img_rgb = remove_hairs(img_rgb)
         #img_rgb = apply_clahe_rgb(img_rgb)    
        
 
         # === Channel sharpening ===
-        img_pil = Image.fromarray(img_rgb)
-        r, g, b = img_pil.split()
-        r = sharpen_channel_pil(r)
-        g = sharpen_channel_pil(g)
-        b = sharpen_channel_pil(b)
-        img_sharp = Image.merge('RGB', (r, g, b))
+        #img_pil = Image.fromarray(img_rgb)
+        #r, g, b = img_pil.split()
+        #r = sharpen_channel_pil(r)
+        #g = sharpen_channel_pil(g)
+        #b = sharpen_channel_pil(b)
+        #img_sharp = Image.merge('RGB', (r, g, b))
 
         # === Save processed image ===
-        img_sharp.save(processed_path)
-        
+        img_pil = Image.fromarray(img_rgb) #img_sharp.save(processed_path)
+        img_pil.save(processed_path)       #img_sharp.save(processed_path)
+
     print(f"{key.upper()}: {len(all_images)} images processed.")
