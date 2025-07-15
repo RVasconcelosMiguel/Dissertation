@@ -85,9 +85,7 @@ print(f"[INFO] Test ROC AUC: {roc_auc:.4f}")
 
 # === Average Precision Scores ===
 ap_score = average_precision_score(y_true, y_prob)
-ap_100 = average_precision_score(y_true, y_prob, pos_label=1)
 print(f"[INFO] Average Precision (AP): {ap_score:.4f}")
-print(f"[INFO] Average Precision (AP @ 100% Recall): {ap_100:.4f}")
 
 # === Save prediction probability histogram ===
 plt.figure(figsize=(8,6))
@@ -133,7 +131,6 @@ print(f"AP: {ap_score:.4f}")
 print(f"AUC: {roc_auc:.4f}")
 print(f"Sensitivity (Recall): {sensitivity:.4f}")
 print(f"Specificity: {specificity:.4f}")
-print(f"(AP @ 100% Recall): {ap_100:.4f}")
 
 # === Save Confusion Matrix ===
 conf_matrix_path = os.path.join(output_dir, "confusion_matrix_finetune.png")

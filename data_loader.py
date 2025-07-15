@@ -33,18 +33,7 @@ def get_generators(img_size, batch_size):
     print(train_df.head())
 
     # === Define augmentation for training with EfficientNet preprocessing ===
-    train_datagen = ImageDataGenerator(
-        preprocessing_function=preprocess_input,
-        rotation_range=90,
-        width_shift_range=0.15,
-        height_shift_range=0.15,
-        shear_range=15,
-        zoom_range=0.2,
-        horizontal_flip=True,
-        vertical_flip=True,  # Disable for dermoscopy unless orientation invariant
-        brightness_range=[0.8,1.2],
-        fill_mode='nearest'
-    )
+    train_datagen = ImageDataGenerator(preprocessing_function=preprocess_input)
 
     # === Define preprocessing only for validation and test sets ===
     test_val_datagen = ImageDataGenerator(preprocessing_function=preprocess_input)
