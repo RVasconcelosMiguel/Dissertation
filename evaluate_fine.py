@@ -5,7 +5,7 @@ import time
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.metrics import classification_report, roc_auc_score, confusion_matrix
+from sklearn.metrics import classification_report, roc_auc_score, confusion_matrix, average_precision_score
 
 from model import build_model
 from data_loader import get_generators
@@ -82,6 +82,12 @@ save_roc_curve(y_true, y_prob, roc_curve_path)
 roc_auc = roc_auc_score(y_true, y_prob)
 print(f"[INFO] ROC curve saved to {roc_curve_path}")
 print(f"[INFO] Test ROC AUC: {roc_auc:.4f}")
+
+# === Average Precision Scores ===
+ap_score = average_precision_score(y_true, y_prob)
+ap_100 = average_precision_score(y_true, y_prob, pos_label=1)
+print(f"[INFO] Average Precision (AP): {ap_score:.4f}")
+print(f"[INFO] Average Precision (AP @ 100% Recall): {ap_100:.4f}")
 
 # === Save prediction probability histogram ===
 plt.figure(figsize=(8,6))
