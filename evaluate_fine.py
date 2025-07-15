@@ -129,11 +129,11 @@ sensitivity = tp / (tp + fn) if (tp + fn) > 0 else 0
 
 print(f"Confusion Matrix: \n{cm}")
 print(f"Accuracy: {report['accuracy']:.4f}")
-print(f"[INFO] Average Precision (AP): {ap_score:.4f}")
+print(f"AP: {ap_score:.4f}")
 print(f"AUC: {roc_auc:.4f}")
 print(f"Sensitivity (Recall): {sensitivity:.4f}")
 print(f"Specificity: {specificity:.4f}")
-print(f"[INFO] Average Precision (AP @ 100% Recall): {ap_100:.4f}")
+print(f"(AP @ 100% Recall): {ap_100:.4f}")
 
 # === Save Confusion Matrix ===
 conf_matrix_path = os.path.join(output_dir, "confusion_matrix_finetune.png")
