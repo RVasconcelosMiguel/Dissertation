@@ -1,4 +1,4 @@
-from tensorflow.keras.applications import EfficientNetB0, EfficientNetB1, EfficientNetB2, EfficientNetB3, EfficientNetB4
+from tensorflow.keras.applications import EfficientNetB0, EfficientNetB1, EfficientNetB2, EfficientNetB3, EfficientNetB4, EfficientNetB5, EfficientNetB6, EfficientNetB7
 from tensorflow.keras.layers import Input, Conv2D, MaxPooling2D, Flatten, Dropout, Dense, BatchNormalization, GlobalAveragePooling2D, GlobalMaxPooling2D, Multiply, Reshape, Activation, Concatenate, Add
 from tensorflow.keras.models import Model
 from tensorflow.keras.regularizers import l2
@@ -6,43 +6,40 @@ from tensorflow.keras.activations import swish
 import tensorflow as tf
 
 # === CBAM MODULE ===
-
 def cbam_block(input_feature, ratio=8):
     channel = input_feature.shape[-1]
-    
+
     shared_layer_one = Dense(channel // ratio, activation='relu', kernel_initializer='he_normal', use_bias=True, bias_initializer='zeros')
     shared_layer_two = Dense(channel, kernel_initializer='he_normal', use_bias=True, bias_initializer='zeros')
-    
+
     avg_pool = GlobalAveragePooling2D()(input_feature)
     avg_pool = Reshape((1,1,channel))(avg_pool)
     avg_pool = shared_layer_one(avg_pool)
     avg_pool = shared_layer_two(avg_pool)
-    
+
     max_pool = GlobalMaxPooling2D()(input_feature)
     max_pool = Reshape((1,1,channel))(max_pool)
     max_pool = shared_layer_one(max_pool)
     max_pool = shared_layer_two(max_pool)
-    
+
     cbam_feature = Add()([avg_pool, max_pool])
     cbam_feature = Activation('sigmoid')(cbam_feature)
     cbam_feature = Multiply()([input_feature, cbam_feature])
-    
+
     avg_pool = tf.reduce_mean(cbam_feature, axis=3, keepdims=True)
     max_pool = tf.reduce_max(cbam_feature, axis=3, keepdims=True)
     concat = Concatenate(axis=3)([avg_pool, max_pool])
     cbam_feature = Conv2D(filters=1, kernel_size=7, strides=1, padding='same',
                           activation='sigmoid', kernel_initializer='he_normal', use_bias=False)(concat)
     cbam_feature = Multiply()([cbam_feature, input_feature])
-    
+
     return cbam_feature
 
 # === EfficientNet builder with separate dropout and L2 for base and head ===
-
 def build_efficientnet_generic(EfficientNetClass, img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base, use_cbam=False):
     input_tensor = Input(shape=(img_size, img_size, 3))
     base_model = EfficientNetClass(include_top=False, weights="imagenet", input_tensor=input_tensor)
 
-    # Apply L2 regularisation to Conv2D layers in base model
     for layer in base_model.layers:
         if isinstance(layer, Conv2D):
             layer.kernel_regularizer = l2(l2_lambda_base)
@@ -50,17 +47,14 @@ def build_efficientnet_generic(EfficientNetClass, img_size, dropout_head, dropou
     x = base_model.output
     x = GlobalAveragePooling2D()(x)
 
-    # Optional Dropout for base features
     if dropout_base > 0:
         x = Dropout(dropout_base)(x)
 
-    # CBAM integration (only in B3, B4)
     if use_cbam:
         x = Reshape((1,1,x.shape[-1]))(x)
         x = cbam_block(x)
         x = Reshape((x.shape[-1],))(x)
 
-    # === Head layers (same as pretraining) ===
     x = Dense(256, kernel_regularizer=l2(l2_lambda_head))(x)
     x = BatchNormalization()(x)
     x = swish(x)
@@ -77,7 +71,6 @@ def build_efficientnet_generic(EfficientNetClass, img_size, dropout_head, dropou
     return model, base_model
 
 # === EfficientNet variants ===
-
 def build_efficientnetb0(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base):
     return build_efficientnet_generic(EfficientNetB0, img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base)
 
@@ -93,8 +86,16 @@ def build_efficientnetb3(img_size, dropout_head, dropout_base, l2_lambda_head, l
 def build_efficientnetb4(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base):
     return build_efficientnet_generic(EfficientNetB4, img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base, use_cbam=True)
 
-# === Custom CNN ===
+def build_efficientnetb5(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base):
+    return build_efficientnet_generic(EfficientNetB5, img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base)
 
+def build_efficientnetb6(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base):
+    return build_efficientnet_generic(EfficientNetB6, img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base)
+
+def build_efficientnetb7(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base):
+    return build_efficientnet_generic(EfficientNetB7, img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base)
+
+# === Custom CNN ===
 def build_custom_cnn(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base):
     input_tensor = Input(shape=(img_size, img_size, 3))
 
@@ -134,7 +135,6 @@ def build_custom_cnn(img_size, dropout_head, dropout_base, l2_lambda_head, l2_la
     return model, base_model
 
 # === build_model dispatcher ===
-
 def build_model(model_name, img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base):
     if model_name == "efficientnetb0":
         return build_efficientnetb0(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base)
@@ -146,6 +146,12 @@ def build_model(model_name, img_size, dropout_head, dropout_base, l2_lambda_head
         return build_efficientnetb3(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base)
     elif model_name == "efficientnetb4":
         return build_efficientnetb4(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base)
+    elif model_name == "efficientnetb5":
+        return build_efficientnetb5(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base)
+    elif model_name == "efficientnetb6":
+        return build_efficientnetb6(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base)
+    elif model_name == "efficientnetb7":
+        return build_efficientnetb7(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base)
     elif model_name == "custom_cnn":
         return build_custom_cnn(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base)
     else:

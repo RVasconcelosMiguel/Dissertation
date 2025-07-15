@@ -17,8 +17,8 @@ from data_loader import get_generators
 from plot_utils import plot_history_head
 
 # === CONFIGURATION ===
-model_name = "efficientnetb1"
-IMG_SIZE = 240
+model_name = "efficientnetb7"
+IMG_SIZE = 600
 BATCH_SIZE = 16
 
 # Head training configuration
