@@ -17,7 +17,7 @@ L2_REG_H = 1e-3
 L2_REG_F = 1e-5
 
 target_recall = 0.85  # Adjust to 0.90 or 0.95 depending on the desired recall
-MIN_THRESHOLD = 0.4
+MIN_THRESHOLD = 0.15
 
 # === PATHS (aligned with train_finetune.py) ===
 MODEL_DIR = "outputs/fine/model"
