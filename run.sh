@@ -32,8 +32,8 @@ python 3_augmentation.py | tee outputs/aug_log.txt
 #echo "=== TRAINING FINE ==="
 #python train_fine.py | tee outputs/fine/results/train_fine_log.txt
 
-#echo "=== POSTPROCESSING ==="
-#python postprocessing.py | tee outputs/postprocessing_log.txt
+echo "=== POSTPROCESSING ==="
+python postprocessing.py | tee outputs/postprocessing_log.txt
 
 echo "=== EVALUATION FINE ==="
 python evaluate_fine.py | tee outputs/fine/results/evaluate_fine_log.txt
