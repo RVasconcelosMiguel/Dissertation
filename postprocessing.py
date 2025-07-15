@@ -7,8 +7,8 @@ from model import build_model
 from data_loader import get_generators
 
 # === CONFIGURATION ===
-model_name = "efficientnetb4"
-IMG_SIZE = 380
+model_name = "efficientnetb3"
+IMG_SIZE = 300
 BATCH_SIZE = 16
 
 DROPOUT_H = 0.6

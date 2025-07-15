@@ -12,8 +12,8 @@ from data_loader import get_generators
 from plot_utils import save_confusion_matrix, save_roc_curve
 
 # === CONFIGURATION ===
-model_name = "efficientnetb4"
-IMG_SIZE = 380
+model_name = "efficientnetb3"
+IMG_SIZE = 300
 BATCH_SIZE = 16
 THRESHOLD = 0.5
 
