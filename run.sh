@@ -11,11 +11,11 @@ python dir_creator.py
 #python 1_dataset_load.py | tee outputs/load_log.txt
 
 #Initialization
-echo "=== Preprocess ==="
-python 2_preprocess.py | tee outputs/preprocess_log.txt
+#echo "=== Preprocess ==="
+#python 2_preprocess.py | tee outputs/preprocess_log.txt
 
-#echo "=== Augmentation ==="
-#python 3_augmentation.py | tee outputs/aug_log.txt
+echo "=== Augmentation ==="
+python 3_augmentation.py | tee outputs/aug_log.txt
 
 
 
