@@ -32,7 +32,7 @@ python dir_creator.py
 #echo "=== TRAINING FINE ==="
 #python train_fine.py | tee outputs/fine/results/train_fine_log.txt
 
-echo "=== POSTPROCESSING ==="
+#echo "=== POSTPROCESSING ==="
 python postprocessing.py | tee outputs/postprocessing_log.txt
 
 echo "=== EVALUATION FINE ==="
