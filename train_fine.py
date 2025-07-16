@@ -23,8 +23,8 @@ np.random.seed(SEED)
 random.seed(SEED)
 
 # === CONFIGURATION ===
-model_name = "efficientnetb7"
-IMG_SIZE = 600
+model_name = "efficientnetb0"
+IMG_SIZE = 224
 BATCH_SIZE = 16
 FINE_TUNE_EPOCHS = 60
 FINE_TUNE_LR = (3e-5)/(0.96**27)
