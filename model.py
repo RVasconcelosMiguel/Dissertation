@@ -1,42 +1,12 @@
 from tensorflow.keras.applications import EfficientNetB0, EfficientNetB1, EfficientNetB2, EfficientNetB3, EfficientNetB4, EfficientNetB5, EfficientNetB6, EfficientNetB7
-from tensorflow.keras.layers import Input, Conv2D, MaxPooling2D, Flatten, Dropout, Dense, BatchNormalization, GlobalAveragePooling2D, GlobalMaxPooling2D, Multiply, Reshape, Activation, Concatenate, Add
+from tensorflow.keras.layers import Input, Conv2D, MaxPooling2D, Flatten, Dropout, Dense, BatchNormalization, GlobalAveragePooling2D
 from tensorflow.keras.models import Model
 from tensorflow.keras.regularizers import l2
 from tensorflow.keras.activations import swish
 import tensorflow as tf
 
-# === CBAM MODULE ===
-def cbam_block(input_feature, ratio=8):
-    channel = input_feature.shape[-1]
-
-    shared_layer_one = Dense(channel // ratio, activation='relu', kernel_initializer='he_normal', use_bias=True, bias_initializer='zeros')
-    shared_layer_two = Dense(channel, kernel_initializer='he_normal', use_bias=True, bias_initializer='zeros')
-
-    avg_pool = GlobalAveragePooling2D()(input_feature)
-    avg_pool = Reshape((1,1,channel))(avg_pool)
-    avg_pool = shared_layer_one(avg_pool)
-    avg_pool = shared_layer_two(avg_pool)
-
-    max_pool = GlobalMaxPooling2D()(input_feature)
-    max_pool = Reshape((1,1,channel))(max_pool)
-    max_pool = shared_layer_one(max_pool)
-    max_pool = shared_layer_two(max_pool)
-
-    cbam_feature = Add()([avg_pool, max_pool])
-    cbam_feature = Activation('sigmoid')(cbam_feature)
-    cbam_feature = Multiply()([input_feature, cbam_feature])
-
-    avg_pool = tf.reduce_mean(cbam_feature, axis=3, keepdims=True)
-    max_pool = tf.reduce_max(cbam_feature, axis=3, keepdims=True)
-    concat = Concatenate(axis=3)([avg_pool, max_pool])
-    cbam_feature = Conv2D(filters=1, kernel_size=7, strides=1, padding='same',
-                          activation='sigmoid', kernel_initializer='he_normal', use_bias=False)(concat)
-    cbam_feature = Multiply()([cbam_feature, input_feature])
-
-    return cbam_feature
-
 # === EfficientNet builder with separate dropout and L2 for base and head ===
-def build_efficientnet_generic(EfficientNetClass, img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base, use_cbam=False):
+def build_efficientnet_generic(EfficientNetClass, img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base):
     input_tensor = Input(shape=(img_size, img_size, 3))
     base_model = EfficientNetClass(include_top=False, weights="imagenet", input_tensor=input_tensor)
 
@@ -49,11 +19,6 @@ def build_efficientnet_generic(EfficientNetClass, img_size, dropout_head, dropou
 
     if dropout_base > 0:
         x = Dropout(dropout_base)(x)
-
-    if use_cbam:
-        x = Reshape((1,1,x.shape[-1]))(x)
-        x = cbam_block(x)
-        x = Reshape((x.shape[-1],))(x)
 
     x = Dense(256, kernel_regularizer=l2(l2_lambda_head))(x)
     x = BatchNormalization()(x)
@@ -81,10 +46,10 @@ def build_efficientnetb2(img_size, dropout_head, dropout_base, l2_lambda_head, l
     return build_efficientnet_generic(EfficientNetB2, img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base)
 
 def build_efficientnetb3(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base):
-    return build_efficientnet_generic(EfficientNetB3, img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base, use_cbam=True)
+    return build_efficientnet_generic(EfficientNetB3, img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base)
 
 def build_efficientnetb4(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base):
-    return build_efficientnet_generic(EfficientNetB4, img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base, use_cbam=True)
+    return build_efficientnet_generic(EfficientNetB4, img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base)
 
 def build_efficientnetb5(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base):
     return build_efficientnet_generic(EfficientNetB5, img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base)
