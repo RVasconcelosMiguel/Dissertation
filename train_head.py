@@ -17,12 +17,12 @@ from data_loader import get_generators
 from plot_utils import plot_history_head
 
 # === CONFIGURATION ===
-model_name = "efficientnetb4"
-IMG_SIZE = 380
+model_name = "efficientnetb5"
+IMG_SIZE = 456
 BATCH_SIZE = 16
 
 # Head training configuration
-EPOCHS_HEAD = 1
+EPOCHS_HEAD = 25
 LEARNING_RATE_HEAD = 5e-5
 LABEL_SMOOTHING_H = 0.04
 
@@ -103,8 +103,6 @@ model, base_model = build_model(
     l2_lambda_head=L2_REG_HEAD,
     l2_lambda_base=L2_REG_BASE
 )
-
-model.summary()
 
 # === CALLBACKS ===
 callbacks_head = [

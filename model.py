@@ -72,13 +72,13 @@ def build_efficientnet_generic(EfficientNetClass, img_size, dropout_head, dropou
 
 # === EfficientNet variants ===
 def build_efficientnetb0(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base):
-    return build_efficientnet_generic(EfficientNetB0, img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base)
+    return build_efficientnet_generic(EfficientNetB0, img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base, use_cbam=True)
 
 def build_efficientnetb1(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base):
-    return build_efficientnet_generic(EfficientNetB1, img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base)
+    return build_efficientnet_generic(EfficientNetB1, img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base, use_cbam=True)
 
 def build_efficientnetb2(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base):
-    return build_efficientnet_generic(EfficientNetB2, img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base)
+    return build_efficientnet_generic(EfficientNetB2, img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base, use_cbam=True)
 
 def build_efficientnetb3(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base):
     return build_efficientnet_generic(EfficientNetB3, img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base, use_cbam=True)
@@ -87,13 +87,13 @@ def build_efficientnetb4(img_size, dropout_head, dropout_base, l2_lambda_head, l
     return build_efficientnet_generic(EfficientNetB4, img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base, use_cbam=True)
 
 def build_efficientnetb5(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base):
-    return build_efficientnet_generic(EfficientNetB5, img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base)
+    return build_efficientnet_generic(EfficientNetB5, img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base, use_cbam=True)
 
 def build_efficientnetb6(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base):
-    return build_efficientnet_generic(EfficientNetB6, img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base)
+    return build_efficientnet_generic(EfficientNetB6, img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base, use_cbam=True)
 
 def build_efficientnetb7(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base):
-    return build_efficientnet_generic(EfficientNetB7, img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base)
+    return build_efficientnet_generic(EfficientNetB7, img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base, use_cbam=True)
 
 # === Custom CNN ===
 def build_custom_cnn(img_size, dropout_head, dropout_base, l2_lambda_head, l2_lambda_base):
