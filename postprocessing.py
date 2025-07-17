@@ -9,7 +9,7 @@ from data_loader import get_generators
 # === CONFIGURATION ===
 model_name = "efficientnetb6"
 IMG_SIZE = 528
-BATCH_SIZE = 16
+BATCH_SIZE = 8
 
 DROPOUT_H = 0.6
 DROPOUT_F = 0.2

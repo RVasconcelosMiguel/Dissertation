@@ -25,7 +25,7 @@ random.seed(SEED)
 # === CONFIGURATION ===
 model_name = "efficientnetb6"
 IMG_SIZE = 528
-BATCH_SIZE = 16
+BATCH_SIZE = 8
 FINE_TUNE_EPOCHS = 60
 FINE_TUNE_LR = (3e-5)/(0.96**27)
 LABEL_SMOOTHING_F = 0

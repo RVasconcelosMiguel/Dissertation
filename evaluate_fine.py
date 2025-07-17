@@ -14,7 +14,7 @@ from plot_utils import save_confusion_matrix, save_roc_curve
 # === CONFIGURATION ===
 model_name = "efficientnetb6"
 IMG_SIZE = 528
-BATCH_SIZE = 16
+BATCH_SIZE = 8
 
 # === Paths ===
 output_dir = "outputs/fine/results"
