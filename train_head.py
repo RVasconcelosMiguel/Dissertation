@@ -19,7 +19,7 @@ from plot_utils import plot_history_head
 # === CONFIGURATION ===
 model_name = "efficientnetb7"
 IMG_SIZE = 600
-BATCH_SIZE = 8
+BATCH_SIZE = 4
 
 # Head training configuration
 EPOCHS_HEAD = 25
