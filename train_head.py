@@ -38,7 +38,7 @@ CLASS_WEIGHTS_MULT_HEAD = 1.5
 # Learning rate scheduler
 lr_schedule = ExponentialDecay(
     initial_learning_rate=LEARNING_RATE_HEAD,
-    decay_steps=60,
+    decay_steps=256,
     decay_rate=0.93,
     staircase=True
 )
