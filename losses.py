@@ -3,12 +3,7 @@ import tensorflow as tf
 from tensorflow.keras import backend as K
 
 def focal_loss(gamma=2.0, alpha=None):
-    """
-    Focal Loss for binary classification.
-    gamma: focusing parameter.
-    alpha: class balancing weight (float in [0, 1] or None).
-           If alpha is None, no class weighting is applied.
-    """
+
     def focal_loss_fixed(y_true, y_pred):
         epsilon = K.epsilon()
         y_pred = K.clip(y_pred, epsilon, 1. - epsilon)

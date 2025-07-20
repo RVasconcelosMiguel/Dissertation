@@ -5,14 +5,7 @@ from sklearn.metrics import confusion_matrix, roc_curve, auc
 
 
 def plot_history(histories, save_path, metrics):
-    """
-    Plot training and validation metrics in one figure per metric with subplots for each phase.
 
-    Args:
-        histories (dict): Dictionary containing histories per training phase.
-        save_path (str): Directory path to save plots.
-        metrics (list): List of metric names to plot.
-    """
     os.makedirs(save_path, exist_ok=True)
 
     phases = ["head", "fine_1", "fine_2", "fine_3"]
@@ -57,14 +50,7 @@ def plot_history(histories, save_path, metrics):
 
 
 def plot_history_head(history, save_path, metrics):
-    """
-    Plot training and validation metrics for head-only training (single phase).
 
-    Args:
-        history (dict): Training history dictionary (from model.fit()).
-        save_path (str): Directory path to save plots.
-        metrics (list): List of metric names to plot.
-    """
     os.makedirs(save_path, exist_ok=True)
 
     for metric in metrics:
@@ -90,14 +76,7 @@ def plot_history_head(history, save_path, metrics):
         plt.close()
 
 def plot_history_finetune_stages(histories, save_path, metrics):
-    """
-    Plot training and validation metrics for each fine-tuning stage separately.
 
-    Args:
-        histories (dict): Dictionary containing histories per fine-tuning stage.
-        save_path (str): Directory path to save plots.
-        metrics (list): List of metric names to plot.
-    """
     os.makedirs(save_path, exist_ok=True)
 
     for metric in metrics:

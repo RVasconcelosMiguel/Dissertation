@@ -9,7 +9,7 @@ from sklearn.model_selection import train_test_split
 
 # === Define target final number of images per class ===
 TARGET_COUNT_PER_CLASS = {
-    0: 509,  # class 0 (benign)
+    0: 509,   # class 0 (benign)
     1: 509    # class 1 (malignant)
 }
 

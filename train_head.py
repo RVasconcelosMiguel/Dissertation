@@ -17,8 +17,8 @@ from data_loader import get_generators
 from plot_utils import plot_history_head
 
 # === CONFIGURATION ===
-model_name = "efficientnetb2"
-IMG_SIZE = 260
+model_name = "efficientnetb4"
+IMG_SIZE = 380
 BATCH_SIZE = 16
 
 # Head training configuration
@@ -27,10 +27,10 @@ LEARNING_RATE_HEAD = 5e-5
 LABEL_SMOOTHING_H = 0.04
 
 DROPOUT_HEAD = 0.6
-DROPOUT_BASE = 0.0  # No dropout on base model during head training
+DROPOUT_BASE = 0.0
 
 L2_REG_HEAD = 1e-3
-L2_REG_BASE = 0.0   # No L2 on base model during head training
+L2_REG_BASE = 0.0
 
 THRESHOLD = 0.5
 CLASS_WEIGHTS_MULT_HEAD = 1.5

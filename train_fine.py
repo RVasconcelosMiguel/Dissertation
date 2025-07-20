@@ -23,16 +23,16 @@ np.random.seed(SEED)
 random.seed(SEED)
 
 # === CONFIGURATION ===
-model_name = "efficientnetb2"
-IMG_SIZE = 260
+model_name = "efficientnetb4"
+IMG_SIZE = 380
 BATCH_SIZE = 16
 FINE_TUNE_EPOCHS = 60
 FINE_TUNE_LR = (3e-5)/(0.96**27)
 LABEL_SMOOTHING_F = 0
 
-DROPOUT_H = 0.6   # Consistent with head
+DROPOUT_H = 0.6  
 L2_REG_H = 1e-3
-DROPOUT_F = 0.2   # Base dropout during fine-tuning
+DROPOUT_F = 0.2 
 L2_REG_F = 1e-5
 
 THRESHOLD = 0.5
@@ -109,7 +109,7 @@ base_model.trainable = True
 
 # === Unfreeze only selected BatchNormalization layers ===
 bn_layers = [layer for layer in base_model.layers if isinstance(layer, tf.keras.layers.BatchNormalization)]
-num_unfreeze = max(1, int(len(bn_layers) * 0.75))  # Unfreeze last 75% of BN layers
+num_unfreeze = max(1, int(len(bn_layers) * 0.75))
 
 for layer in bn_layers[:-num_unfreeze]:
     layer.trainable = False

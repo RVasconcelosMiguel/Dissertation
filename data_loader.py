@@ -13,7 +13,7 @@ test_folder = os.path.join(BASE_PATH, "test")
 # === LOAD CSV DATAFRAMES ===
 def load_dataframes(csv_path):
     df = pd.read_csv(csv_path, header=None, names=['image', 'label'])
-    df['label'] = df['label'].astype(str)  # Convert labels to string for flow_from_dataframe compatibility
+    df['label'] = df['label'].astype(str) 
     return df
 
 # === DATA GENERATORS FUNCTION ===
@@ -41,7 +41,7 @@ def get_generators(img_size, batch_size):
         shear_range=15,
         zoom_range=0.2,
         horizontal_flip=True,
-        vertical_flip=True,  # Disable for dermoscopy unless orientation invariant
+        vertical_flip=True,
         brightness_range=[0.8,1.2],
         fill_mode='nearest'
     )

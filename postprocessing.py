@@ -7,8 +7,8 @@ from model import build_model
 from data_loader import get_generators
 
 # === CONFIGURATION ===
-model_name = "efficientnetb2"
-IMG_SIZE = 260
+model_name = "efficientnetb4"
+IMG_SIZE = 380
 BATCH_SIZE = 16
 
 DROPOUT_H = 0.6
@@ -16,7 +16,8 @@ DROPOUT_F = 0.2
 L2_REG_H = 1e-3
 L2_REG_F = 1e-5
 
-target_recall = 0.85  # Adjust to 0.90 or 0.95 depending on the desired recall
+# Adjust depending on the desired validation recall
+target_recall = 0.85
 MIN_THRESHOLD = 0.15
 
 # === PATHS (aligned with train_finetune.py) ===

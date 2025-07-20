@@ -12,8 +12,8 @@ from data_loader import get_generators
 from plot_utils import save_confusion_matrix, save_roc_curve
 
 # === CONFIGURATION ===
-model_name = "efficientnetb2"
-IMG_SIZE = 260
+model_name = "efficientnetb4"
+IMG_SIZE = 380
 BATCH_SIZE = 16
 
 # === Paths ===
@@ -57,7 +57,7 @@ print(f"[INFO] Building model architecture: {model_name} for evaluation...")
 model, _ = build_model(
     model_name=model_name,
     img_size=IMG_SIZE,
-    dropout_head=0.0,   # Disable dropout during evaluation
+    dropout_head=0.0,
     dropout_base=0.0,
     l2_lambda_head=1e-3,
     l2_lambda_base=1e-3

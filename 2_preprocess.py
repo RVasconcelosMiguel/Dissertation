@@ -5,7 +5,7 @@ from PIL import Image, ImageFilter, ImageChops
 from tqdm import tqdm
 
 # === CONFIGURATION ===
-use_binary_mask = False  # Set to False to disable mask application
+use_binary_mask = False
 
 # === Folders ===
 input_folders = {
