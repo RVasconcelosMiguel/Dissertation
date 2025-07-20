@@ -19,7 +19,7 @@ from plot_utils import plot_history_head
 # === CONFIGURATION ===
 model_name = "efficientnetb0"
 IMG_SIZE = 224
-BATCH_SIZE = 4
+BATCH_SIZE = 16
 
 # Head training configuration
 EPOCHS_HEAD = 25
@@ -38,7 +38,7 @@ CLASS_WEIGHTS_MULT_HEAD = 1.5
 # Learning rate scheduler
 lr_schedule = ExponentialDecay(
     initial_learning_rate=LEARNING_RATE_HEAD,
-    decay_steps=256,
+    decay_steps=64,
     decay_rate=0.93,
     staircase=True
 )

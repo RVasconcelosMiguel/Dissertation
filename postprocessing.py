@@ -9,7 +9,7 @@ from data_loader import get_generators
 # === CONFIGURATION ===
 model_name = "efficientnetb0"
 IMG_SIZE = 224
-BATCH_SIZE = 4
+BATCH_SIZE = 16
 
 DROPOUT_H = 0.6
 DROPOUT_F = 0.2

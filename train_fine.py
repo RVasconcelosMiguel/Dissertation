@@ -25,7 +25,7 @@ random.seed(SEED)
 # === CONFIGURATION ===
 model_name = "efficientnetb0"
 IMG_SIZE = 224
-BATCH_SIZE = 4
+BATCH_SIZE = 16
 FINE_TUNE_EPOCHS = 60
 FINE_TUNE_LR = (3e-5)/(0.96**27)
 LABEL_SMOOTHING_F = 0
@@ -121,7 +121,7 @@ print(f"[INFO] Unfroze the last {num_unfreeze} BatchNormalization layers for ada
 # === COMPILE MODEL ===
 lr_schedule = ExponentialDecay(
     initial_learning_rate=FINE_TUNE_LR,
-    decay_steps=256,
+    decay_steps=64,
     decay_rate=0.96,
     staircase=True
 )
