@@ -59,11 +59,9 @@ The ENb4-CBAM model achieved results above the average diagnostic performance of
 
 After running the pipeline, the following outputs will be generated in the `outputs/` directory:
 
-- `results_head.json` – Evaluation metrics from head-only training  
-- `results_fine.json` – Final evaluation metrics after fine-tuning  
-- `confusion_matrix.png`, `roc_curve.png` – Diagnostic plots  
-- `models/` – Folder with saved model checkpoints  
-- `logs/` – (Optional) Training and evaluation logs
+- `fine/` – For the fine training model, pngs and fine training/evaluate logs
+- `head/` – For the head training model, pngs and head training/evaluate logs
+- `logs` – In the outputs/ directory
 
 ---
 
