@@ -7,8 +7,8 @@ conda activate rm_dermo_env
 python dir_creator.py
 
 #Data Load
-#echo "=== Data Load ==="
-#python 1_dataset_load.py | tee outputs/load_log.txt
+echo "=== Data Load ==="
+python 1_dataset_load.py | tee outputs/load_log.txt
 
 #Initialization
 echo "=== Preprocess ==="
