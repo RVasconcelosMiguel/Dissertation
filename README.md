@@ -18,23 +18,22 @@ The model classifies dermoscopic images as **benign** or **malignant**, with key
 - Two-phase training (head → fine-tuning)
 - Threshold calibration for fixed sensitivity
 
----
+## 📁 Repository Structure
 
-## 📁 Project Structure
-
-├── 1_dataset_load.py # Download and extract ISIC 2016 dataset
-├── 2_preprocess.py # Hair removal, CLAHE, and sharpening
-├── 3_augmentation.py # Data partitioning and augmentation
-├── model.py # ENb4-CBAM model definition
-├── train_head.py # Train classification head only
-├── evaluate_head.py # Evaluate head-only model
-├── train_fine.py # Fine-tune the full model
-├── evaluate_fine.py # Evaluate fine-tuned model
-├── postprocessing.py # Threshold calibration and metric logging
-├── run.sh # Script to execute the full pipeline
-├── figures/ # Optional: plots and visualizations
-└── outputs/ # Evaluation logs, plots, model weights
-
+```bash
+.
+├── 1_dataset_load.py         # Downloads and extracts ISIC 2016 dataset
+├── 2_preprocess.py           # Applies hair removal, CLAHE, and sharpening
+├── 3_augmentation.py         # Data partitioning and augmentation with class balancing
+├── model.py                  # EfficientNet + CBAM model architecture
+├── train_head.py             # Head-only training (frozen base)
+├── evaluate_head.py          # Evaluation of head-only model
+├── train_fine.py             # Fine-tuning with partially unfrozen base
+├── evaluate_fine.py          # Evaluation of fine-tuned model
+├── postprocessing.py         # Threshold calibration and logging
+├── run.sh                    # Shell script to run the full pipeline
+├── figures/                  # (optional) visualizations and ROC/confusion matrix plots
+└── outputs/                  # Logs and results (auto-generated)
 
 ---
 
