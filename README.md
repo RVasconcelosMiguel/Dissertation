@@ -18,23 +18,6 @@ The model classifies dermoscopic images as **benign** or **malignant**, with key
 - Two-phase training (head → fine-tuning)
 - Threshold calibration for fixed sensitivity
 
-## 📁 Repository Structure
-
-```bash
-.
-├── 1_dataset_load.py         # Downloads and extracts ISIC 2016 dataset
-├── 2_preprocess.py           # Applies hair removal, CLAHE, and sharpening
-├── 3_augmentation.py         # Data partitioning and augmentation with class balancing
-├── model.py                  # EfficientNet + CBAM model architecture
-├── train_head.py             # Head-only training (frozen base)
-├── evaluate_head.py          # Evaluation of head-only model
-├── train_fine.py             # Fine-tuning with partially unfrozen base
-├── evaluate_fine.py          # Evaluation of fine-tuned model
-├── postprocessing.py         # Threshold calibration and logging
-├── run.sh                    # Shell script to run the full pipeline
-├── figures/                  # (optional) visualizations and ROC/confusion matrix plots
-└── outputs/                  # Logs and results (auto-generated)
-
 ---
 
 ## ⚙️ Requirements
@@ -49,24 +32,13 @@ The model classifies dermoscopic images as **benign** or **malignant**, with key
 - numpy
 - tqdm
 
-You can install the dependencies using:
-
-```bash
-pip install -r requirements.txt
-
-Or using a conda environment (recommended):
-conda create -n dermo_env python=3.8
-conda activate dermo_env
-pip install -r requirements.txt
-
 ---
 
 ## 🚀 Running the Pipeline
 
 To run the full training and evaluation process:
 
-```bash
-bash run.sh
+./run.sh
 
 ## 📊 Results
 
